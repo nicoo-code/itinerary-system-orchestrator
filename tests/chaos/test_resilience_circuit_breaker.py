@@ -1,4 +1,3 @@
-#!/usr/bin/env python
 """
 Demostración Automatizada de Resiliencia: Circuit Breaker ante Falla Controlada.
 Este script evidencia cómo el sistema tolera la caída o degradación extrema de la API externa
