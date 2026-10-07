@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Sistema Distribuido de Itinerarios Personales</title>
+  
+  <!-- Tipografía Inter -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  
+  <!-- Plotly JS v2.27.0 -->
+  <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
+  
+  <link rel="stylesheet" href="/static/style.css">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="navbar">
+    <div class="navbar-brand">
+      <span class="logo-icon">✈️</span>
+      <h1>Itinerarios Personales <span>| Arquitectura Distribuida</span></h1>
+    </div>
+    <div class="system-status">
+      <span id="gateway-indicator" class="badge badge-success">● Gateway Online</span>
+      <span id="circuit-indicator" class="badge badge-info">Circuit: CLOSED</span>
+    </div>
+  </header>
+
+  <div class="container">
+    <!-- Panel Izquierdo: Formulario y Lista de Itinerarios -->
+    <aside class="panel left">
+      <div class="card">
+        <h2>Planificar Nuevo Itinerario</h2>
+        <p class="subtitle">Validación síncrona HTTP & consistencia Transactional Outbox</p>
+        
+        <div id="alert-box" class="alert d-none"></div>
+
+        <form id="itinerary-form">
+          <label for="user_name">Nombre del Pasajero
+            <input type="text" id="user_name" name="user_name" placeholder="Ej: Juan Pérez" required>
+          </label>
+
+          <div class="form-row">
+            <label for="origin_airport">Aeropuerto de Salida
+              <select id="origin_airport" name="origin_airport" required>
+                <option value="">Cargando catálogo...</option>
+              </select>
+            </label>
+
+            <label for="destination_airport">Aeropuerto de Llegada
+              <select id="destination_airport" name="destination_airport" required>
+                <option value="">Cargando catálogo...</option>
+              </select>
+            </label>
+          </div>
+
+          <div class="form-row">
+            <label for="departure_date">Fecha y Hora de Viaje
+              <input type="datetime-local" id="departure_date" name="departure_date" required>
+            </label>
+
+            <label for="duration_minutes">Duración (minutos)
+              <input type="number" id="duration_minutes" name="duration_minutes" min="15" max="1440" value="55" required>
+            </label>
+          </div>
+
+          <button type="submit" id="btn-submit" class="btn-primary">
+            <span>Confirmar y Guardar Itinerario</span>
+          </button>
+        </form>
+      </div>
+
+      <div class="card mt-4">
+        <div class="card-header-actions">
+          <h3>Itinerarios Registrados</h3>
+          <button id="btn-refresh-itineraries" class="btn-sm">↻ Actualizar</button>
+        </div>
+        <div class="table-container">
+          <table id="itineraries-table">
+            <thead>
+              <tr>
+                <th>Pasajero</th>
+                <th>Ruta</th>
+                <th>Fecha</th>
+                <th>Duración</th>
+                <th>Estado</th>
+              </tr>
+            </thead>
+            <tbody id="itineraries-list">
+              <tr>
+                <td colspan="5" class="text-center text-muted">No hay itinerarios registrados aún.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </aside>
+
+    <!-- Panel Derecho: Visualización Geográfica Plotly JS -->
+    <main class="panel right">
+      <div class="card map-card">
+        <div class="map-header">
+          <h2>Red Cartográfica de Aeropuertos (Plotly JS)</h2>
+          <span class="badge badge-primary" id="airports-count">Cargando...</span>
+        </div>
+        <div id="map"></div>
+      </div>
+    </main>
+  </div>
+
+  <script src="/static/app.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

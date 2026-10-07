@@ -3,65 +3,110 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Booking - Itinerario</title>
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin=""/>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css">
+  <title>Sistema Distribuido de Itinerarios Personales</title>
+  
+  <!-- Tipografía Inter -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  
+  <!-- Plotly JS v2.27.0 -->
+  <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
+  
+  <link rel="stylesheet" href="frontend/style.css">
 </head>
 <body>
+  <header class="navbar">
+    <div class="navbar-brand">
+      <span class="logo-icon">✈️</span>
+      <h1>Itinerarios Personales <span>| Arquitectura Distribuida</span></h1>
+    </div>
+    <div class="system-status">
+      <span id="gateway-indicator" class="badge badge-success">● Gateway Online</span>
+      <span id="circuit-indicator" class="badge badge-info">Circuit: CLOSED</span>
+    </div>
+  </header>
+
   <div class="container">
     <aside class="panel left">
-      <h2>Crear Itinerario</h2>
-      <form id="itinerario-form">
-        <label> Aeropuerto de salida
-          <input type="text" name="salida" placeholder="Ej: El Dorado - BOG" required>
-        </label>
-        <label> Aeropuerto de llegada
-          <input type="text" name="llegada" placeholder="Ej: José María Córdova - MDE" required>
-        </label>
-        <label> Intensidad horaria
-          <select name="intensidad">
-            <option value="baja">Baja</option>
-            <option value="media">Media</option>
-            <option value="alta">Alta</option>
-          </select>
-        </label>
-        <button type="submit">Agregar itinerario</button>
-      </form>
+      <div class="card">
+        <h2>Planificar Nuevo Itinerario</h2>
+        <p class="subtitle">Validación síncrona HTTP & consistencia Transactional Outbox</p>
+        
+        <div id="alert-box" class="alert d-none"></div>
 
-      <h3>Itinerarios</h3>
-      <ul id="itineraries"></ul>
+        <form id="itinerary-form">
+          <label for="user_name">Nombre del Pasajero
+            <input type="text" id="user_name" name="user_name" placeholder="Ej: Juan Pérez" required>
+          </label>
+
+          <div class="form-row">
+            <label for="origin_airport">Aeropuerto de Salida
+              <select id="origin_airport" name="origin_airport" required>
+                <option value="">Cargando catálogo...</option>
+              </select>
+            </label>
+
+            <label for="destination_airport">Aeropuerto de Llegada
+              <select id="destination_airport" name="destination_airport" required>
+                <option value="">Cargando catálogo...</option>
+              </select>
+            </label>
+          </div>
+
+          <div class="form-row">
+            <label for="departure_date">Fecha y Hora de Viaje
+              <input type="datetime-local" id="departure_date" name="departure_date" required>
+            </label>
+
+            <label for="duration_minutes">Duración (minutos)
+              <input type="number" id="duration_minutes" name="duration_minutes" min="15" max="1440" value="55" required>
+            </label>
+          </div>
+
+          <button type="submit" id="btn-submit" class="btn-primary">
+            <span>Confirmar y Guardar Itinerario</span>
+          </button>
+        </form>
+      </div>
+
+      <div class="card mt-4">
+        <div class="card-header-actions">
+          <h3>Itinerarios Registrados</h3>
+          <button id="btn-refresh-itineraries" class="btn-sm">↻ Actualizar</button>
+        </div>
+        <div class="table-container">
+          <table id="itineraries-table">
+            <thead>
+              <tr>
+                <th>Pasajero</th>
+                <th>Ruta</th>
+                <th>Fecha</th>
+                <th>Duración</th>
+                <th>Estado</th>
+              </tr>
+            </thead>
+            <tbody id="itineraries-list">
+              <tr>
+                <td colspan="5" class="text-center text-muted">No hay itinerarios registrados aún.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
     </aside>
 
     <main class="panel right">
-      <div id="map"></div>
+      <div class="card map-card">
+        <div class="map-header">
+          <h2>Red Cartográfica de Aeropuertos (Plotly JS)</h2>
+          <span class="badge badge-primary" id="airports-count">Cargando...</span>
+        </div>
+        <div id="map"></div>
+      </div>
     </main>
   </div>
 
-  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
-  <script src="pluffy.js"></script>
-  <script>
-    document.addEventListener('DOMContentLoaded', ()=>{
-      if(window.pluffy && typeof window.pluffy.initMap === 'function') {
-        window.pluffy.initMap('map');
-      }
-
-      const form = document.getElementById('itinerario-form');
-      const list = document.getElementById('itineraries');
-
-      form.addEventListener('submit', (e)=>{
-        e.preventDefault();
-        const salida = form.salida.value.trim();
-        const llegada = form.llegada.value.trim();
-        const intensidad = form.intensidad.value;
-
-        const li = document.createElement('li');
-        li.textContent = `${salida} → ${llegada} — Intensidad: ${intensidad}`;
-        list.prepend(li);
-
-        form.reset();
-      });
-    });
-  </script>
+  <script src="frontend/app.js"></script>
 </body>
 </html>
