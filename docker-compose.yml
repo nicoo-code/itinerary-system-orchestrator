@@ -31,8 +31,8 @@ services:
   # ==========================================
   airport-service:
     build:
-      context: .
-      dockerfile: ./services/airport-service/Dockerfile
+      context: ./services/airport-service
+      dockerfile: Dockerfile
     container_name: airport-service
     restart: unless-stopped
     ports:
@@ -55,8 +55,8 @@ services:
   # ==========================================
   itinerary-service:
     build:
-      context: .
-      dockerfile: ./services/itinerary-service/Dockerfile
+      context: ./services/itinerary-service
+      dockerfile: Dockerfile
     container_name: itinerary-service
     restart: unless-stopped
     ports:

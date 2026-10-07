@@ -1,11 +1,22 @@
 import uuid
 from datetime import datetime
-from typing import Any, ClassVar
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class CreateItineraryRequest(BaseModel):
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "user_name": "Juan Pérez",
+                "origin_airport_id": 1,
+                "destination_airport_id": 5,
+                "departure_date": "2026-10-15T08:00:00Z",
+                "duration_minutes": 55,
+            }
+        }
+    )
+
     user_name: str = Field(
         ..., min_length=2, max_length=100, description="Nombre del pasajero"
     )
@@ -18,19 +29,10 @@ class CreateItineraryRequest(BaseModel):
         ..., gt=0, le=1440, description="Duración estimada del vuelo en minutos"
     )
 
-    class Config:
-        json_schema_extra: ClassVar[dict[str, Any]] = {
-            "example": {
-                "user_name": "Juan Pérez",
-                "origin_airport_id": 1,
-                "destination_airport_id": 5,
-                "departure_date": "2026-10-15T08:00:00Z",
-                "duration_minutes": 55,
-            }
-        }
-
 
 class ItineraryResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     id: uuid.UUID
     user_name: str
     origin_airport_id: int
@@ -40,9 +42,6 @@ class ItineraryResponse(BaseModel):
     status: str
     created_at: datetime
     updated_at: datetime
-
-    class Config:
-        from_attributes = True
 
 
 class HealthCheckResponse(BaseModel):

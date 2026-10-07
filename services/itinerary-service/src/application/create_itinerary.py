@@ -1,20 +1,24 @@
 import logging
 import uuid
-from datetime import UTC, datetime
+from datetime import datetime
 
+from src.domain.events.itinerary_created_event import ItineraryCreatedEvent
+from src.domain.exceptions import (
+    AirportNotFoundException,
+    InvalidItineraryException,
+)
 from src.domain.models.itinerary import Itinerary, OutboxEvent
 from src.domain.ports.airport_validator_port import AirportValidatorPort
 from src.domain.ports.itinerary_repository_port import ItineraryRepositoryPort
 
 logger = logging.getLogger(__name__)
 
-
-class AirportNotFoundException(Exception):
-    """Excepción de dominio cuando uno de los aeropuertos no existe en el catálogo canónico."""
-
-
-class InvalidItineraryException(Exception):
-    """Excepción de dominio para reglas de negocio inválidas en el itinerario."""
+# Re-exportar excepciones para mantener compatibilidad hacia atrás
+__all__ = [
+    "AirportNotFoundException",
+    "CreateItineraryUseCase",
+    "InvalidItineraryException",
+]
 
 
 class CreateItineraryUseCase:
@@ -80,29 +84,22 @@ class CreateItineraryUseCase:
         )
 
         # 5. Construcción del Evento de Integración para el Buzón Transaccional
-        event_id = uuid.uuid4()
-        event_payload = {
-            "event_id": str(event_id),
-            "event_type": "ItineraryCreatedEvent",
-            "timestamp": datetime.now(UTC).isoformat(),
-            "trace_id": trace_id,
-            "data": {
-                "itinerary_id": str(itinerary_id),
-                "user_name": user_name,
-                "origin_airport_id": origin_airport_id,
-                "destination_airport_id": destination_airport_id,
-                "departure_date": departure_date.isoformat() + "Z",
-                "duration_minutes": duration_minutes,
-                "status": "CREATED",
-            },
-        }
+        integration_event = ItineraryCreatedEvent.create(
+            itinerary_id=itinerary_id,
+            user_name=user_name,
+            origin_airport_id=origin_airport_id,
+            destination_airport_id=destination_airport_id,
+            departure_date=departure_date,
+            duration_minutes=duration_minutes,
+            trace_id=trace_id,
+        )
 
         outbox_event = OutboxEvent(
-            id=event_id,
+            id=uuid.UUID(integration_event.event_id),
             aggregate_type="ITINERARY",
             aggregate_id=itinerary_id,
-            event_type="ItineraryCreatedEvent",
-            payload=event_payload,
+            event_type=integration_event.event_type,
+            payload=integration_event.to_dict(),
             status="PENDING",
         )
 
@@ -111,7 +108,7 @@ class CreateItineraryUseCase:
             itinerary, outbox_event
         )
         logger.info(
-            f"Itinerary {itinerary_id} and OutboxEvent {event_id} persisted atomically.",
+            f"Itinerary {itinerary_id} and OutboxEvent {integration_event.event_id} persisted atomically.",
             extra={"trace_id": trace_id},
         )
         return saved_itinerary

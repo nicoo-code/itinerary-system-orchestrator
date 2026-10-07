@@ -2,7 +2,7 @@
 FROM python:3.11-slim as builder
 
 WORKDIR /app
-COPY services/airport-service/requirements.txt .
+COPY requirements.txt .
 RUN pip install --no-cache-dir --upgrade pip && \
     pip install --no-cache-dir --user -r requirements.txt
 
@@ -18,7 +18,7 @@ ENV PYTHONUNBUFFERED=1
 ENV PYTHONPATH=/app
 
 # Copiar código fuente
-COPY services/airport-service/src /app/src
+COPY src /app/src
 
 EXPOSE 8001
 

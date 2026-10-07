@@ -1,7 +1,9 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class AirportResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     id: int = Field(..., description="ID único del aeropuerto")
     name: str = Field(..., description="Nombre oficial del aeropuerto")
     iata_code: str = Field(..., description="Código IATA de 3 letras")
@@ -12,9 +14,6 @@ class AirportResponse(BaseModel):
     type: str = Field(
         ..., description="Tipo de terminal (Internacional, Nacional, etc.)"
     )
-
-    class Config:
-        from_attributes = True
 
 
 class CircuitBreakerStatusResponse(BaseModel):

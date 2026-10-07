@@ -352,14 +352,25 @@ graph TD
 - Python 3.11+ (opcional para ejecutar pruebas localmente fuera de contenedores).
 - Git configurado.
 
-### 4.2 Despliegue Local con Comando Único
+### 4.2 Clonado del Repositorio Orquestador con Submódulos
+Para clonar la solución completa incluyendo los submódulos independientes (`airport-service` e `itinerary-service`):
+```bash
+git clone --recurse-submodules https://github.com/nicoo-code/Taller-Git-Prueba.git
+cd Taller-Git-Prueba
+```
+*Si el repositorio ya fue clonado previamente sin el flag `--recurse-submodules`:*
+```bash
+git submodule update --init --recursive
+```
+
+### 4.3 Despliegue Local con Comando Único
 Para compilar y desplegar toda la arquitectura de microservicios, bases de datos y middleware:
 ```bash
 docker compose up --build -d
 ```
 *(Alternativa en Windows PowerShell: `.\scripts\init_environment.ps1`)*
 
-### 4.3 Validación del Despliegue Local (Paso a Paso)
+### 4.4 Validación del Despliegue Local (Paso a Paso)
 1. **Verificar el estado de los Contenedores:**
    ```bash
    docker compose ps

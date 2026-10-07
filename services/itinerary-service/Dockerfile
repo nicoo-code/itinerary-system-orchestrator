@@ -2,7 +2,7 @@
 FROM python:3.11-slim as builder
 
 WORKDIR /app
-COPY services/itinerary-service/requirements.txt .
+COPY requirements.txt .
 RUN pip install --no-cache-dir --upgrade pip && \
     pip install --no-cache-dir --user -r requirements.txt
 
@@ -16,8 +16,8 @@ ENV PATH=/root/.local/bin:$PATH
 ENV PYTHONUNBUFFERED=1
 ENV PYTHONPATH=/app
 
-COPY services/itinerary-service/src /app/src
-COPY services/itinerary-service/alembic.ini /app/alembic.ini
+COPY src /app/src
+COPY alembic.ini /app/alembic.ini
 
 EXPOSE 8002
 
