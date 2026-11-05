@@ -2,9 +2,9 @@ name: CI/CD Pipeline - Sistema Distribuido de Itinerarios
 
 on:
   push:
-    branches: [ main, develop, 'feature/**' ]
+    branches: [ main, develop, 'feature/**', 'feat/**' ]
   pull_request:
-    branches: [ main, develop, 'feature/**' ]
+    branches: [ main, develop, 'feature/**', 'feat/**' ]
 
 jobs:
   lint-and-style:
@@ -50,7 +50,7 @@ jobs:
           pip install -r services/itinerary-service/requirements.txt
           pip install -r services/notification-service/requirements.txt
           pip install -r services/api-gateway/requirements.txt
-          pip install pytest pytest-cov pytest-mock httpx
+          pip install pytest pytest-asyncio pytest-cov pytest-mock httpx
 
       - name: Execute Tests with Coverage
         run: |
