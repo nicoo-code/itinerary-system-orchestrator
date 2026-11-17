@@ -1,4 +1,4 @@
-(/* Modernized styles for the booking page */)
+/* Modernized styles for the booking page */
 :root{
 	--bg: #0f1724; /* not used for panel, but available */
 	--panel-bg: #ffffff;
@@ -35,3 +35,5 @@ button:hover{filter:brightness(0.95)}
 	#map{height:50vh}
 }
 
+/* Mensaje de validación del formulario */
+.form-error{margin:8px 0 0 0;font-size:13px;color:#b91c1c;min-height:18px}
