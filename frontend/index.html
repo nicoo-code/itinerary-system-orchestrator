@@ -1,0 +1,853 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>AeroItinerarios | Plataforma Distribuida de Itinerarios de Vuelo</title>
+  
+  <!-- Tipografía Inter -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  
+  <!-- Plotly JS v2.27.0 -->
+  <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
+  
+  <!-- Estilos del Sistema -->
+  <link rel="stylesheet" href="/static/style.css?v=2.1">
+</head>
+<body>
+  <!-- ========================================== -->
+  <!-- 1. ENCABEZADO CORPORATIVO (NAVBAR)         -->
+  <!-- ========================================== -->
+  <header class="navbar">
+    <div class="navbar-brand">
+      <div class="brand-logo-wrapper">
+        <svg class="brand-icon" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M17.8 19.2 16 11l3.5-3.5C21 6 21.5 4 21 3c-1-.5-3 0-4.5 1.5L13 8 4.8 6.2c-.5-.1-.9.1-1.1.5l-.3.5c-.2.5-.1 1 .3 1.3L9 12l-2 3H4l-1 1 3 2 2 3 1-1v-3l3-2 3.5 5.3c.3.4.8.5 1.3.3l.5-.2c.4-.3.6-.7.5-1.2z"/>
+        </svg>
+      </div>
+      <div class="brand-text">
+        <h1>AeroItinerarios <span class="brand-tag">Enterprise</span></h1>
+        <p class="brand-subtitle">Plataforma Distribuida de Transporte Aéreo</p>
+      </div>
+    </div>
+
+    <!-- Indicadores de Salud Perimetral -->
+    <div class="system-status-ribbon">
+      <div id="gateway-indicator" class="status-chip chip-success" title="Estado del API Gateway y Reverse Proxy">
+        <span class="status-pulse"></span>
+        <span class="status-label">Gateway Activo</span>
+      </div>
+      <div id="circuit-indicator" class="status-chip chip-info" title="Estado de Resiliencia del Circuit Breaker">
+        <span class="status-pulse"></span>
+        <span id="circuit-indicator-text" class="status-label">Circuit: CLOSED</span>
+      </div>
+      <button id="btn-global-refresh" class="btn-icon" title="Sincronizar datos con microservicios" aria-label="Sincronizar">
+        <svg class="svg-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M21 2v6h-6M3 12a9 9 0 0 1 15-6.7L21 8M3 22v-6h6M21 12a9 9 0 0 1-15 6.7L3 16"/>
+        </svg>
+      </button>
+    </div>
+  </header>
+
+  <!-- ========================================== -->
+  <!-- 2. SISTEMA DE NAVEGACIÓN MULTI-PESTAÑA      -->
+  <!-- ========================================== -->
+  <nav class="tabs-nav-container" aria-label="Navegación principal">
+    <div class="tabs-list" role="tablist">
+      <!-- Pestaña 1: Planificador -->
+      <button class="tab-button active" id="tab-btn-planner" data-tab="tab-planner" role="tab" aria-selected="true" aria-controls="tab-planner">
+        <svg class="tab-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M8 2v4M16 2v4M21 13V6a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h8M3 10h18M16 19h6M19 16v6"/>
+        </svg>
+        <span class="tab-title">Planificador de Vuelos</span>
+      </button>
+
+      <!-- Pestaña 2: Mapa y Aeropuertos -->
+      <button class="tab-button" id="tab-btn-map" data-tab="tab-map" role="tab" aria-selected="false" aria-controls="tab-map">
+        <svg class="tab-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/>
+          <circle cx="12" cy="10" r="3"/>
+        </svg>
+        <span class="tab-title">Explorador de Aeropuertos</span>
+        <span class="tab-counter" id="badge-airports-count">0</span>
+      </button>
+
+      <!-- Pestaña 3: Mis Itinerarios -->
+      <button class="tab-button" id="tab-btn-itineraries" data-tab="tab-itineraries" role="tab" aria-selected="false" aria-controls="tab-itineraries">
+        <svg class="tab-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M2 9a3 3 0 0 1 0 6v2a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-2a3 3 0 0 1 0-6V7a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2Z"/>
+          <path d="M13 5v2M13 17v2M13 11v2"/>
+        </svg>
+        <span class="tab-title">Mis Itinerarios y Reservas</span>
+        <span class="tab-counter" id="badge-itineraries-count">0</span>
+      </button>
+
+      <!-- Pestaña 4: Monitoreo & Auditoría -->
+      <button class="tab-button" id="tab-btn-monitoring" data-tab="tab-monitoring" role="tab" aria-selected="false" aria-controls="tab-monitoring">
+        <svg class="tab-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M22 12h-4l-3 9L9 3l-3 9H2"/>
+        </svg>
+        <span class="tab-title">Centro de Monitoreo & Auditoría</span>
+      </button>
+    </div>
+  </nav>
+
+  <!-- Contenedor flotante de alertas y notificaciones Toast -->
+  <div id="toast-container" class="toast-container" aria-live="polite"></div>
+
+  <!-- ========================================== -->
+  <!-- 3. CONTENIDO PRINCIPAL (TAB PANELS)        -->
+  <!-- ========================================== -->
+  <main class="main-content">
+    
+    <!-- =================================================== -->
+    <!-- PESTAÑA 1: PLANIFICADOR DE ITINERARIOS              -->
+    <!-- =================================================== -->
+    <section id="tab-planner" class="tab-panel active" role="tabpanel" aria-labelledby="tab-btn-planner">
+      <div class="planner-layout">
+        
+        <!-- Tarjeta de Formulario Operativo -->
+        <div class="card form-card">
+          <div class="card-header">
+            <div class="card-title-group">
+              <h2>Nuevo Itinerario de Vuelo</h2>
+              <p class="subtitle">Validación HTTP síncrona con garantía transaccional Outbox Pattern</p>
+            </div>
+            <span class="badge badge-accent">Paso 1 de 2</span>
+          </div>
+
+          <form id="itinerary-form" novalidate>
+            <!-- Fase 1: Datos del Pasajero -->
+            <div class="form-section">
+              <div class="section-legend">
+                <svg class="legend-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/>
+                  <circle cx="12" cy="7" r="4"/>
+                </svg>
+                <span>1. Información del Pasajero & Logística</span>
+              </div>
+
+              <div class="form-group">
+                <label for="user_name">Nombre Completo del Pasajero</label>
+                <div class="input-wrapper">
+                  <svg class="input-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/>
+                    <circle cx="12" cy="7" r="4"/>
+                  </svg>
+                  <input type="text" id="user_name" name="user_name" placeholder="Ej: Dra. Valentina Restrepo" required autocomplete="name">
+                </div>
+              </div>
+
+              <div class="form-grid-2">
+                <div class="form-group">
+                  <label for="departure_date">Fecha y Hora Programada</label>
+                  <div class="input-wrapper">
+                    <svg class="input-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                      <rect width="18" height="18" x="3" y="4" rx="2" ry="2"/>
+                      <line x1="16" x2="16" y1="2" y2="6"/>
+                      <line x1="8" x2="8" y1="2" y2="6"/>
+                      <line x1="3" x2="21" y1="10" y2="10"/>
+                    </svg>
+                    <input type="datetime-local" id="departure_date" name="departure_date" required>
+                  </div>
+                </div>
+
+                <div class="form-group">
+                  <label for="duration_minutes">Duración Estimada (Minutos)</label>
+                  <div class="input-wrapper">
+                    <svg class="input-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                      <circle cx="12" cy="12" r="10"/>
+                      <polyline points="12 6 12 12 16 14"/>
+                    </svg>
+                    <input type="number" id="duration_minutes" name="duration_minutes" min="15" max="1440" value="55" required>
+                  </div>
+                  <div class="quick-presets">
+                    <span class="preset-label">Atajos:</span>
+                    <button type="button" class="preset-chip" data-mins="45">45m</button>
+                    <button type="button" class="preset-chip active" data-mins="55">55m</button>
+                    <button type="button" class="preset-chip" data-mins="80">80m</button>
+                    <button type="button" class="preset-chip" data-mins="120">120m</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Fase 2: Configuración de Ruta Aérea -->
+            <div class="form-section">
+              <div class="section-legend">
+                <svg class="legend-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <circle cx="12" cy="12" r="10"/>
+                  <polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76"/>
+                </svg>
+                <span>2. Configuración de Ruta Aérea Nacional</span>
+              </div>
+
+              <div class="route-selection-container">
+                <div class="form-group airport-picker" id="origin-combobox-wrapper">
+                  <label for="origin_airport_input">Terminal de Salida (Origen)</label>
+                  <input type="hidden" id="origin_airport" name="origin_airport" required>
+                  <div class="combobox-container">
+                    <div class="combobox-input-box">
+                      <span class="combobox-iata-pill d-none" id="origin-iata-pill">---</span>
+                      <svg class="combobox-search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <circle cx="11" cy="11" r="8"/>
+                        <path d="m21 21-4.3-4.3"/>
+                      </svg>
+                      <input
+                        type="text"
+                        id="origin_airport_input"
+                        class="combobox-input"
+                        placeholder="Buscar ciudad, IATA o aeropuerto..."
+                        autocomplete="off"
+                        role="combobox"
+                        aria-autocomplete="list"
+                        aria-expanded="false"
+                        aria-controls="origin-combobox-listbox"
+                      >
+                      <button type="button" id="origin-clear-btn" class="combobox-clear-btn d-none" title="Limpiar búsqueda" aria-label="Limpiar búsqueda">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                      </button>
+                      <button type="button" id="origin-toggle-btn" class="combobox-chevron-btn" title="Desplegar catálogo" aria-label="Desplegar catálogo">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+                      </button>
+                    </div>
+                    <div id="origin-combobox-listbox" class="combobox-dropdown d-none" role="listbox" aria-label="Aeropuertos de origen"></div>
+                  </div>
+                </div>
+
+                <div class="route-swap-divider">
+                  <button type="button" id="btn-swap-route" class="btn-swap" title="Invertir terminales de origen y destino" aria-label="Invertir ruta">
+                    <svg class="svg-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                      <path d="M7 16V4M7 4L3 8M7 4l4 4M17 8v12M17 20l4-4M17 20l-4-4"/>
+                    </svg>
+                  </button>
+                </div>
+
+                <div class="form-group airport-picker" id="destination-combobox-wrapper">
+                  <label for="destination_airport_input">Terminal de Llegada (Destino)</label>
+                  <input type="hidden" id="destination_airport" name="destination_airport" required>
+                  <div class="combobox-container">
+                    <div class="combobox-input-box">
+                      <span class="combobox-iata-pill d-none" id="destination-iata-pill">---</span>
+                      <svg class="combobox-search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <circle cx="11" cy="11" r="8"/>
+                        <path d="m21 21-4.3-4.3"/>
+                      </svg>
+                      <input
+                        type="text"
+                        id="destination_airport_input"
+                        class="combobox-input"
+                        placeholder="Buscar ciudad, IATA o aeropuerto..."
+                        autocomplete="off"
+                        role="combobox"
+                        aria-autocomplete="list"
+                        aria-expanded="false"
+                        aria-controls="destination-combobox-listbox"
+                      >
+                      <button type="button" id="destination-clear-btn" class="combobox-clear-btn d-none" title="Limpiar búsqueda" aria-label="Limpiar búsqueda">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                      </button>
+                      <button type="button" id="destination-toggle-btn" class="combobox-chevron-btn" title="Desplegar catálogo" aria-label="Desplegar catálogo">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+                      </button>
+                    </div>
+                    <div id="destination-combobox-listbox" class="combobox-dropdown combobox-dropdown-right d-none" role="listbox" aria-label="Aeropuertos de destino"></div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Alerta contextual de colisión de ruta -->
+              <div id="route-warning" class="inline-notice notice-warning d-none">
+                <svg class="notice-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/>
+                  <line x1="12" x2="12" y1="9" y2="13"/>
+                  <line x1="12" x2="12.01" y1="17" y2="17"/>
+                </svg>
+                <span>El terminal de origen y destino no pueden ser el mismo.</span>
+              </div>
+            </div>
+
+            <div class="form-actions">
+              <button type="submit" id="btn-submit" class="btn btn-primary btn-lg">
+                <svg class="btn-icon-svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
+                  <polyline points="22 4 12 14.01 9 11.01"/>
+                </svg>
+                <span id="btn-submit-text">Confirmar y Registrar Itinerario</span>
+              </button>
+            </div>
+          </form>
+        </div>
+
+        <!-- Tarjeta de Resumen Dinámico (Tarjeta de Embarque / Boarding Pass) -->
+        <div class="planner-preview-column">
+          <div class="card preview-card">
+            <div class="card-header">
+              <div class="card-title-group">
+                <h3>Resumen Previo de Embarque</h3>
+                <p class="subtitle">Previsualización en tiempo real del pase de abordaje</p>
+              </div>
+              <span class="badge badge-success">Vista Dinámica</span>
+            </div>
+
+            <!-- Billete / Boarding Pass Corporativo -->
+            <div class="boarding-pass" id="boarding-pass">
+              <div class="pass-header">
+                <div class="pass-airline">
+                  <svg class="pass-airline-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M17.8 19.2 16 11l3.5-3.5C21 6 21.5 4 21 3c-1-.5-3 0-4.5 1.5L13 8 4.8 6.2c-.5-.1-.9.1-1.1.5l-.3.5c-.2.5-.1 1 .3 1.3L9 12l-2 3H4l-1 1 3 2 2 3 1-1v-3l3-2 3.5 5.3c.3.4.8.5 1.3.3l.5-.2c.4-.3.6-.7.5-1.2z"/>
+                  </svg>
+                  <span>AEROITINERARIOS AIRWAYS</span>
+                </div>
+                <span class="pass-class">CLASE COMERCIAL</span>
+              </div>
+
+              <!-- Ruta Origen -> Destino Visual -->
+              <div class="pass-route-visual">
+                <div class="pass-point origin">
+                  <span class="point-code" id="bp-origin-code">BOG</span>
+                  <span class="point-city" id="bp-origin-city">Bogotá D.C.</span>
+                </div>
+                
+                <div class="pass-flight-path">
+                  <span class="flight-duration" id="bp-duration-tag">55 MIN</span>
+                  <div class="flight-line">
+                    <span class="flight-line-dot"></span>
+                    <span class="flight-line-dash"></span>
+                    <svg class="flight-path-plane" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                      <path d="m12 2 3 5 5 1-4 4 1 6-5-3-5 3 1-6-4-4 5-1z"/>
+                    </svg>
+                    <span class="flight-line-dash"></span>
+                    <span class="flight-line-dot"></span>
+                  </div>
+                  <span class="flight-type">Vuelo Directo</span>
+                </div>
+
+                <div class="pass-point destination">
+                  <span class="point-code" id="bp-dest-code">MDE</span>
+                  <span class="point-city" id="bp-dest-city">Medellín (Rionegro)</span>
+                </div>
+              </div>
+
+              <!-- Rejilla de Datos del Pasajero -->
+              <div class="pass-meta-grid">
+                <div class="pass-meta-item">
+                  <span class="meta-label">Pasajero</span>
+                  <span class="meta-value" id="bp-passenger-name">Nombre del Pasajero</span>
+                </div>
+                <div class="pass-meta-item">
+                  <span class="meta-label">Fecha Programada</span>
+                  <span class="meta-value" id="bp-departure-date">--</span>
+                </div>
+                <div class="pass-meta-item">
+                  <span class="meta-label">Vuelo</span>
+                  <span class="meta-value">AV-2026</span>
+                </div>
+                <div class="pass-meta-item">
+                  <span class="meta-label">Estado</span>
+                  <span class="meta-value badge-pill" id="bp-status-badge">BORRADOR</span>
+                </div>
+              </div>
+
+              <!-- Talón de Embarque con Código de Barras Vectorial -->
+              <div class="pass-stub">
+                <div class="pass-notch-left"></div>
+                <div class="pass-notch-right"></div>
+                <div class="barcode-container">
+                  <div class="barcode-lines">
+                    <span class="bar b-thick"></span><span class="bar b-thin"></span><span class="bar b-med"></span>
+                    <span class="bar b-thin"></span><span class="bar b-thick"></span><span class="bar b-thin"></span>
+                    <span class="bar b-med"></span><span class="bar b-thick"></span><span class="bar b-thin"></span>
+                    <span class="bar b-med"></span><span class="bar b-thick"></span><span class="bar b-thin"></span>
+                    <span class="bar b-thin"></span><span class="bar b-med"></span><span class="bar b-thick"></span>
+                  </div>
+                  <span class="barcode-text">TX-OUTBOX-ACID-VERIFIED</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="architecture-footnote">
+              <svg class="footnote-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10"/>
+                <path d="m9 12 2 2 4-4"/>
+              </svg>
+              <span>Persistencia ACID en PostgreSQL desacoplada hacia RabbitMQ mediante el patrón Transactional Outbox.</span>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- =================================================== -->
+    <!-- PESTAÑA 2: EXPLORADOR DE AEROPUERTOS Y MAPA TÁCTICO -->
+    <!-- =================================================== -->
+    <section id="tab-map" class="tab-panel" role="tabpanel" aria-labelledby="tab-btn-map">
+      <div class="map-view-layout">
+        
+        <!-- Barra de Búsqueda y Filtros de Aeropuertos -->
+        <div class="map-controls-card card">
+          <div class="map-search-wrapper">
+            <svg class="search-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="11" cy="11" r="8"/>
+              <path d="m21 21-4.3-4.3"/>
+            </svg>
+            <input type="text" id="airport-search-input" placeholder="Buscar por código IATA, nombre de aeropuerto, ciudad o departamento...">
+            <button type="button" id="btn-clear-airport-search" class="btn-clear-input d-none" aria-label="Limpiar búsqueda">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+            </button>
+          </div>
+
+          <div class="map-filter-group">
+            <span class="filter-label">Filtro por Categoría:</span>
+            <div class="filter-chips">
+              <button class="chip active" data-filter="all">Todos</button>
+              <button class="chip" data-filter="internacional">Internacionales</button>
+              <button class="chip" data-filter="nacional">Nacionales</button>
+            </div>
+          </div>
+
+          <div class="map-stats-indicator">
+            <span class="badge badge-primary" id="map-counter-badge">Cargando catálogo...</span>
+          </div>
+        </div>
+
+        <!-- Rejilla Principal: Mapa Interactivo y Ficha Técnica -->
+        <div class="map-content-grid">
+          <!-- Contenedor del Mapa Cartográfico Plotly JS -->
+          <div class="card map-viewport-card">
+            <div class="map-header-bar">
+              <div class="map-title-info">
+                <h3>Red Cartográfica Nacional de Colombia</h3>
+                <span class="map-tip">Haga clic en un marcador para inspeccionar su ficha técnica.</span>
+              </div>
+              <button id="btn-recenter-map" class="btn btn-sm btn-secondary" title="Centrar mapa en Colombia">
+                <svg class="svg-icon-sm" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <circle cx="12" cy="12" r="10"/>
+                  <line x1="22" x2="18" y1="12" y2="12"/>
+                  <line x1="6" x2="2" y1="12" y2="12"/>
+                  <line x1="12" x2="12" y1="6" y2="2"/>
+                  <line x1="12" x2="12" y1="22" y2="18"/>
+                </svg>
+                Centrar Coordenadas
+              </button>
+            </div>
+
+            <div id="map" class="plotly-map-container"></div>
+          </div>
+
+          <!-- Ficha Técnica del Aeropuerto Seleccionado -->
+          <aside class="card airport-detail-card" id="airport-detail-card">
+            <div class="card-header">
+              <div class="card-title-group">
+                <h3>Ficha Técnica del Aeropuerto</h3>
+                <p class="subtitle">Detalles canónicos normalizados por el Adaptador Hexagonal</p>
+              </div>
+              <span class="badge badge-accent" id="detail-iata-badge">BOG</span>
+            </div>
+
+            <div class="detail-content">
+              <div class="detail-header-hero">
+                <div class="terminal-icon-box">
+                  <svg class="terminal-svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/>
+                    <circle cx="12" cy="10" r="3"/>
+                  </svg>
+                </div>
+                <div>
+                  <h4 id="detail-name">El Dorado International</h4>
+                  <p id="detail-city-dept" class="detail-sub">Bogotá, Cundinamarca</p>
+                </div>
+              </div>
+
+              <div class="technical-specs-list">
+                <div class="spec-row">
+                  <span class="spec-label">Identificador Canónico</span>
+                  <span class="spec-value" id="detail-id">ID: 1</span>
+                </div>
+                <div class="spec-row">
+                  <span class="spec-label">Código IATA Oficial</span>
+                  <span class="spec-value code-font" id="detail-iata">BOG</span>
+                </div>
+                <div class="spec-row">
+                  <span class="spec-label">Clasificación Operativa</span>
+                  <span class="spec-value" id="detail-type">Internacional</span>
+                </div>
+                <div class="spec-row">
+                  <span class="spec-label">Coordenadas Geográficas</span>
+                  <span class="spec-value code-font" id="detail-coords">4.70159, -74.1469</span>
+                </div>
+                <div class="spec-row">
+                  <span class="spec-label">Estrategia de Caché</span>
+                  <span class="spec-value text-success">Redis Cache-Aside (TTL 1h)</span>
+                </div>
+              </div>
+
+              <div class="detail-actions">
+                <button type="button" id="btn-use-as-origin" class="btn btn-outline btn-block">
+                  <svg class="svg-icon-sm" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <line x1="7" x2="17" y1="17" y2="7"/>
+                    <polyline points="7 7 17 7 17 17"/>
+                  </svg>
+                  Fijar como Aeropuerto de Origen
+                </button>
+                <button type="button" id="btn-use-as-dest" class="btn btn-outline btn-block">
+                  <svg class="svg-icon-sm" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <line x1="17" x2="7" y1="7" y2="17"/>
+                    <polyline points="17 17 7 17 7 7"/>
+                  </svg>
+                  Fijar como Aeropuerto de Destino
+                </button>
+              </div>
+            </div>
+          </aside>
+        </div>
+
+        <!-- Directorio Tabular de Búsqueda Rápida de Aeropuertos -->
+        <div class="card mt-4">
+          <div class="card-header">
+            <div class="card-title-group">
+              <h3>Directorio Catálogo de Terminales Aéreos</h3>
+              <p class="subtitle">Listado de aeropuertos sincronizados con api-colombia.com</p>
+            </div>
+            <span class="table-results-tag" id="airport-results-count">52 resultados</span>
+          </div>
+
+          <div class="table-container airport-table-container">
+            <table id="airports-catalog-table">
+              <thead>
+                <tr>
+                  <th>IATA</th>
+                  <th>Nombre Oficial del Aeropuerto</th>
+                  <th>Ciudad</th>
+                  <th>Departamento</th>
+                  <th>Tipo</th>
+                  <th>Coordenadas</th>
+                  <th class="text-right">Acción</th>
+                </tr>
+              </thead>
+              <tbody id="airports-catalog-tbody">
+                <tr>
+                  <td colspan="7" class="text-center text-muted">Cargando directorio de aeropuertos...</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- =================================================== -->
+    <!-- PESTAÑA 3: MIS ITINERARIOS Y RESERVAS               -->
+    <!-- =================================================== -->
+    <section id="tab-itineraries" class="tab-panel" role="tabpanel" aria-labelledby="tab-btn-itineraries">
+      <div class="itineraries-layout">
+        
+        <!-- Barra de Herramientas de Itinerarios -->
+        <div class="card itineraries-toolbar-card">
+          <div class="toolbar-search-wrapper">
+            <svg class="search-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="11" cy="11" r="8"/>
+              <path d="m21 21-4.3-4.3"/>
+            </svg>
+            <input type="text" id="itinerary-search-input" placeholder="Buscar reservas por nombre de pasajero, ruta o UUID...">
+          </div>
+
+          <div class="toolbar-actions">
+            <!-- Selector de Vista (Tarjetas vs Tabla) -->
+            <div class="view-toggle-group">
+              <button id="btn-view-cards" class="view-toggle-btn active" title="Visualización en Tarjetas de Embarque">
+                <svg class="svg-icon-sm" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <rect width="7" height="7" x="3" y="3" rx="1"/>
+                  <rect width="7" height="7" x="14" y="3" rx="1"/>
+                  <rect width="7" height="7" x="14" y="14" rx="1"/>
+                  <rect width="7" height="7" x="3" y="14" rx="1"/>
+                </svg>
+                <span>Tarjetas</span>
+              </button>
+              <button id="btn-view-table" class="view-toggle-btn" title="Visualización en Tabla Corporativa">
+                <svg class="svg-icon-sm" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <line x1="8" x2="21" y1="6" y2="6"/>
+                  <line x1="8" x2="21" y1="12" y2="12"/>
+                  <line x1="8" x2="21" y1="18" y2="18"/>
+                  <line x1="3" x2="3.01" y1="6" y2="6"/>
+                  <line x1="3" x2="3.01" y1="12" y2="12"/>
+                  <line x1="3" x2="3.01" y1="18" y2="18"/>
+                </svg>
+                <span>Tabla</span>
+              </button>
+            </div>
+
+            <button id="btn-refresh-itineraries" class="btn btn-secondary">
+              <svg class="svg-icon-sm" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M21 2v6h-6M3 12a9 9 0 0 1 15-6.7L21 8M3 22v-6h6M21 12a9 9 0 0 1-15 6.7L3 16"/>
+              </svg>
+              <span>Actualizar</span>
+            </button>
+
+            <button id="btn-export-itineraries" class="btn btn-secondary">
+              <svg class="svg-icon-sm" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                <polyline points="7 10 12 15 17 10"/>
+                <line x1="12" x2="12" y1="15" y2="3"/>
+              </svg>
+              <span>Exportar JSON</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Vista 1: Tarjetas de Itinerarios (Cards Grid) -->
+        <div id="itineraries-cards-view" class="itineraries-cards-grid">
+          <!-- Renderizado dinámico vía JavaScript -->
+        </div>
+
+        <!-- Vista 2: Tabla Corporativa de Itinerarios -->
+        <div id="itineraries-table-view" class="card d-none">
+          <div class="table-container">
+            <table id="itineraries-table">
+              <thead>
+                <tr>
+                  <th>Pasajero</th>
+                  <th>Ruta Aérea</th>
+                  <th>Fecha de Vuelo</th>
+                  <th>Duración</th>
+                  <th>Identificador (UUID)</th>
+                  <th>Estado</th>
+                  <th class="text-right">Acciones</th>
+                </tr>
+              </thead>
+              <tbody id="itineraries-list">
+                <tr>
+                  <td colspan="7" class="text-center text-muted">No hay itinerarios registrados aún.</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- =================================================== -->
+    <!-- PESTAÑA 4: CENTRO DE MONITOREO & AUDITORÍA          -->
+    <!-- =================================================== -->
+    <section id="tab-monitoring" class="tab-panel" role="tabpanel" aria-labelledby="tab-btn-monitoring">
+      <div class="monitoring-layout">
+        
+        <!-- Encabezado de Monitoreo -->
+        <div class="card monitoring-header-card">
+          <div class="card-title-group">
+            <h2>Observabilidad de Microservicios & Auditoría de Eventos</h2>
+            <p class="subtitle">Telemetría de salud, estado del Circuit Breaker y registro de eventos serverless</p>
+          </div>
+
+          <div class="monitoring-controls">
+            <label class="toggle-control">
+              <input type="checkbox" id="chk-auto-poll-health" checked>
+              <span class="toggle-slider"></span>
+              <span class="toggle-text">Sondeo Automático (10s)</span>
+            </label>
+
+            <button id="btn-refresh-monitoring" class="btn btn-secondary">
+              <svg class="svg-icon-sm" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M21 2v6h-6M3 12a9 9 0 0 1 15-6.7L21 8M3 22v-6h6M21 12a9 9 0 0 1-15 6.7L3 16"/>
+              </svg>
+              <span>Refrescar Métricas</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Tarjetas de Diagnóstico de Componentes -->
+        <div class="health-cards-grid">
+          <!-- Tarjeta 1: API Gateway -->
+          <div class="card health-card" id="card-health-gateway">
+            <div class="health-card-header">
+              <div class="health-icon-wrapper bg-blue">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <rect width="20" height="8" x="2" y="2" rx="2" ry="2"/>
+                  <rect width="20" height="8" x="2" y="14" rx="2" ry="2"/>
+                  <line x1="6" x2="6.01" y1="6" y2="6"/>
+                  <line x1="6" x2="6.01" y1="18" y2="18"/>
+                </svg>
+              </div>
+              <span class="badge badge-success" id="gw-health-status">OPERATIVO</span>
+            </div>
+            <h4>API Gateway / BFF (:8000)</h4>
+            <p class="health-service-desc">Perímetro, Rate Limiting (60 req/min) y Propagación W3C Tracing</p>
+            <div class="health-metrics">
+              <div class="metric-item">
+                <span class="metric-label">Latencia Perimetral</span>
+                <span class="metric-val" id="gw-latency">--</span>
+              </div>
+              <div class="metric-item">
+                <span class="metric-label">Enrutamiento REST</span>
+                <span class="metric-val text-success">/api/v1/*</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Tarjeta 2: Airport Microservice & Circuit Breaker -->
+          <div class="card health-card" id="card-health-airport">
+            <div class="health-card-header">
+              <div class="health-icon-wrapper bg-sky">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10"/>
+                </svg>
+              </div>
+              <span class="badge badge-info" id="cb-health-state">CLOSED</span>
+            </div>
+            <h4>Airport Microservice (:8001)</h4>
+            <p class="health-service-desc">Arquitectura Hexagonal, Redis Cache-Aside & Circuit Breaker</p>
+            <div class="health-metrics">
+              <div class="metric-item">
+                <span class="metric-label">Circuit Breaker</span>
+                <span class="metric-val" id="cb-metric-state">CLOSED</span>
+              </div>
+              <div class="metric-item">
+                <span class="metric-label">Caché Redis</span>
+                <span class="metric-val" id="redis-metric-status">Conectado</span>
+              </div>
+              <div class="metric-item">
+                <span class="metric-label">Fallas Acumuladas</span>
+                <span class="metric-val" id="cb-metric-failures">0 / 3</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Tarjeta 3: Itinerary Microservice & Outbox -->
+          <div class="card health-card" id="card-health-itinerary">
+            <div class="health-card-header">
+              <div class="health-icon-wrapper bg-emerald">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <ellipse cx="12" cy="5" rx="9" ry="3"/>
+                  <path d="M3 5v14a9 3 0 0 0 18 0V5"/>
+                  <path d="M3 12a9 3 0 0 0 18 0"/>
+                </svg>
+              </div>
+              <span class="badge badge-success" id="itinerary-health-status">OPERATIVO</span>
+            </div>
+            <h4>Itinerary Service (:8002)</h4>
+            <p class="health-service-desc">PostgreSQL ACID + Transactional Outbox Relay Worker</p>
+            <div class="health-metrics">
+              <div class="metric-item">
+                <span class="metric-label">Base de Datos</span>
+                <span class="metric-val" id="db-metric-status">PostgreSQL UP</span>
+              </div>
+              <div class="metric-item">
+                <span class="metric-label">Outbox Relay Worker</span>
+                <span class="metric-val" id="outbox-metric-status">Activo</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Tarjeta 4: Notification Component Serverless -->
+          <div class="card health-card" id="card-health-notification">
+            <div class="health-card-header">
+              <div class="health-icon-wrapper bg-amber">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/>
+                  <path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/>
+                </svg>
+              </div>
+              <span class="badge badge-success" id="notif-health-status">FaaS ACTIVO</span>
+            </div>
+            <h4>Notification Service (:8003)</h4>
+            <p class="health-service-desc">Consumidor Reactivo AMQP & Despacho Asíncrono Serverless</p>
+            <div class="health-metrics">
+              <div class="metric-item">
+                <span class="metric-label">RabbitMQ Consumer</span>
+                <span class="metric-val" id="amqp-metric-status">Escuchando</span>
+              </div>
+              <div class="metric-item">
+                <span class="metric-label">Total Notificaciones</span>
+                <span class="metric-val" id="notifs-metric-total">0 Despachadas</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Tabla de Auditoría de Notificaciones Serverless -->
+        <div class="card mt-4">
+          <div class="card-header">
+            <div class="card-title-group">
+              <h3>Registro de Notificaciones y Eventos AMQP</h3>
+              <p class="subtitle">Trazabilidad de eventos procesados por la función SendNotificationFunction</p>
+            </div>
+            <button id="btn-export-audit-log" class="btn btn-sm btn-secondary">
+              <svg class="svg-icon-sm" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                <polyline points="7 10 12 15 17 10"/>
+                <line x1="12" x2="12" y1="15" y2="3"/>
+              </svg>
+              Descargar Log
+            </button>
+          </div>
+
+          <div class="table-container">
+            <table id="notifications-table">
+              <thead>
+                <tr>
+                  <th>Fecha de Despacho</th>
+                  <th>ID Notificación</th>
+                  <th>ID Evento Outbox</th>
+                  <th>Destinatario</th>
+                  <th>Canal</th>
+                  <th>Mensaje Despachado</th>
+                  <th>Estado</th>
+                </tr>
+              </thead>
+              <tbody id="notifications-log-list">
+                <tr>
+                  <td colspan="7" class="text-center text-muted">No se registran eventos de notificación aún.</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+  </main>
+
+  <!-- ========================================== -->
+  <!-- 4. MODAL DE CONFIRMACIÓN CORPORATIVO       -->
+  <!-- ========================================== -->
+  <div id="delete-modal" class="modal-overlay d-none" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+    <div class="modal-dialog card">
+      <div class="modal-header">
+        <div class="modal-icon-badge">
+          <svg class="modal-svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M3 6h18M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2M10 11v6M14 11v6"/>
+          </svg>
+        </div>
+        <div class="modal-title-group">
+          <h3 id="modal-title">Confirmar Cancelación de Reserva</h3>
+          <p class="subtitle">Esta acción eliminará el itinerario del microservicio y base de datos relacional.</p>
+        </div>
+      </div>
+      
+      <div class="modal-body">
+        <p>¿Está seguro de que desea eliminar permanentemente la reserva de <strong id="modal-passenger-name">--</strong> con trayecto <strong id="modal-route-name">--</strong>?</p>
+        <p class="modal-subtext">Se emitirá una petición <code>DELETE /api/v1/itineraries/{id}</code> hacia el cluster.</p>
+      </div>
+
+      <div class="modal-actions">
+        <button type="button" id="btn-cancel-delete" class="btn btn-secondary">Conservar Itinerario</button>
+        <button type="button" id="btn-confirm-delete" class="btn btn-danger">
+          <svg class="svg-icon-sm" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M3 6h18M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/>
+          </svg>
+          Eliminar Definitivamente
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Scripts de la Aplicación -->
+  <script src="/static/app.js?v=2.1"></script>
+</body>
+</html>
