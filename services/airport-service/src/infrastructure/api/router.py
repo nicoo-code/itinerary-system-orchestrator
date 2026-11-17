@@ -53,6 +53,13 @@ def create_airport_router(
         tags=["Health"],
         summary="Healthcheck y estado de dependencias",
     )
+    @router.get(
+        "/api/v1/airports/health",
+        response_model=HealthCheckResponse,
+        tags=["Health"],
+        summary="Healthcheck y estado de dependencias (alias)",
+        include_in_schema=False,
+    )
     async def healthcheck():
         redis_ok = await redis_adapter.ping()
         cb_status = circuit_breaker.get_status()

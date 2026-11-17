@@ -143,7 +143,10 @@ async def forward_request(target_url: str, request: Request) -> Response:
 # Rutas de aeropuertos
 @app.api_route("/api/v1/airports/{path:path}", methods=["GET", "POST", "PUT", "DELETE"])
 async def route_airports(path: str, request: Request):
-    target = f"{AIRPORT_SERVICE_URL}/api/v1/airports/{path}"
+    if path == "health":
+        target = f"{AIRPORT_SERVICE_URL}/health"
+    else:
+        target = f"{AIRPORT_SERVICE_URL}/api/v1/airports/{path}"
     return await forward_request(target, request)
 
 
@@ -158,7 +161,10 @@ async def route_airports_root(request: Request):
     "/api/v1/itineraries/{path:path}", methods=["GET", "POST", "PUT", "DELETE"]
 )
 async def route_itineraries(path: str, request: Request):
-    target = f"{ITINERARY_SERVICE_URL}/api/v1/itineraries/{path}"
+    if path == "health":
+        target = f"{ITINERARY_SERVICE_URL}/health"
+    else:
+        target = f"{ITINERARY_SERVICE_URL}/api/v1/itineraries/{path}"
     return await forward_request(target, request)
 
 
@@ -171,7 +177,10 @@ async def route_itineraries_root(request: Request):
 # Rutas de notificaciones
 @app.api_route("/api/v1/notifications/{path:path}", methods=["GET"])
 async def route_notifications(path: str, request: Request):
-    target = f"{NOTIFICATION_SERVICE_URL}/api/v1/notifications/{path}"
+    if path == "health":
+        target = f"{NOTIFICATION_SERVICE_URL}/health"
+    else:
+        target = f"{NOTIFICATION_SERVICE_URL}/api/v1/notifications/{path}"
     return await forward_request(target, request)
 
 
@@ -181,28 +190,39 @@ async def health():
     return {"status": "UP", "service": "api-gateway", "timestamp": time.time()}
 
 
-# Montar frontend estático si existe
-if os.path.exists(FRONTEND_DIR):
-    app.mount("/static", StaticFiles(directory=FRONTEND_DIR), name="static")
+# Resolver directorio frontend
+effective_frontend_dir = FRONTEND_DIR
+if not os.path.exists(effective_frontend_dir):
+    candidate = os.path.abspath(
+        os.path.join(os.path.dirname(__file__), "../../../frontend")
+    )
+    if os.path.exists(candidate):
+        effective_frontend_dir = candidate
+
+# Montar frontend estático y servir rutas raíz
+if os.path.exists(effective_frontend_dir):
+    app.mount("/static", StaticFiles(directory=effective_frontend_dir), name="static")
 
     @app.get("/")
     async def serve_index():
-        index_path = os.path.join(FRONTEND_DIR, "index.html")
+        index_path = os.path.join(effective_frontend_dir, "index.html")
         if os.path.exists(index_path):
             return FileResponse(index_path)
         return {"message": "API Gateway running. Frontend index.html not found."}
 
-else:
-    # Si corre en modo local fuera del contenedor
-    local_frontend = os.path.abspath(
-        os.path.join(os.path.dirname(__file__), "../../../frontend")
-    )
-    if os.path.exists(local_frontend):
-        app.mount("/static", StaticFiles(directory=local_frontend), name="static")
+    @app.get("/style.css")
+    async def serve_root_style():
+        p = os.path.join(effective_frontend_dir, "style.css")
+        if os.path.exists(p):
+            return FileResponse(p, media_type="text/css")
+        return Response(status_code=404)
 
-        @app.get("/")
-        async def serve_local_index():
-            return FileResponse(os.path.join(local_frontend, "index.html"))
+    @app.get("/app.js")
+    async def serve_root_js():
+        p = os.path.join(effective_frontend_dir, "app.js")
+        if os.path.exists(p):
+            return FileResponse(p, media_type="application/javascript")
+        return Response(status_code=404)
 
 
 if __name__ == "__main__":

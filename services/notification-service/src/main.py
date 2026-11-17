@@ -65,6 +65,7 @@ app = FastAPI(
 
 
 @app.get("/health")
+@app.get("/api/v1/notifications/health")
 async def health():
     return {
         "status": "UP",

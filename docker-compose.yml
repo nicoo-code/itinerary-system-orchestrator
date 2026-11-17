@@ -22,6 +22,8 @@ services:
         condition: service_started
       itinerary-service:
         condition: service_started
+    volumes:
+      - ./frontend:/app/frontend
     networks:
       - frontend-net
       - backend-net

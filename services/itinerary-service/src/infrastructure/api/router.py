@@ -112,6 +112,13 @@ def create_itinerary_router(
         tags=["Health"],
         summary="Healthcheck del servicio",
     )
+    @router.get(
+        "/api/v1/itineraries/health",
+        response_model=HealthCheckResponse,
+        tags=["Health"],
+        summary="Healthcheck del servicio (alias)",
+        include_in_schema=False,
+    )
     async def healthcheck():
         db_ok = True
         try:
