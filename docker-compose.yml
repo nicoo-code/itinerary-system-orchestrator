@@ -16,6 +16,7 @@ services:
       - ITINERARY_SERVICE_URL=http://itinerary-service:8002
       - NOTIFICATION_SERVICE_URL=http://notification-service:8003
       - FRONTEND_DIR=/app/frontend
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://jaeger:4317
       - LOG_LEVEL=INFO
     depends_on:
       airport-service:

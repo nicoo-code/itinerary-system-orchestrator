@@ -3,7 +3,6 @@ import json
 import logging
 import sys
 import time
-import uuid
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
@@ -21,6 +20,13 @@ from src.infrastructure.clients.airport_http_validator import AirportHttpValidat
 from src.infrastructure.config import settings
 from src.infrastructure.messaging.outbox_relay_worker import OutboxRelayWorker
 from src.infrastructure.messaging.rabbitmq_publisher import RabbitMQPublisher
+from src.infrastructure.observability import (
+    DEFAULT_SPAN_ID,
+    DEFAULT_TRACE_ID,
+    extract_trace_context,
+    get_active_span_ids,
+    setup_telemetry,
+)
 from src.infrastructure.persistence.models import Base
 from src.infrastructure.persistence.sqlalchemy_itinerary_repo import (
     SqlAlchemyItineraryRepository,
@@ -30,14 +36,19 @@ from src.infrastructure.persistence.sqlalchemy_itinerary_repo import (
 # Logging Estructurado JSON
 class JsonFormatter(logging.Formatter):
     def format(self, record):
+        otel_trace_id, otel_span_id = get_active_span_ids()
+        trace_id = (
+            getattr(record, "trace_id", None) or otel_trace_id or DEFAULT_TRACE_ID
+        )
+        span_id = getattr(record, "span_id", None) or otel_span_id or DEFAULT_SPAN_ID
         log_record = {
             "timestamp": self.formatTime(record, "%Y-%m-%dT%H:%M:%SZ"),
             "level": record.levelname,
             "service": settings.service_name,
             "message": record.getMessage(),
             "module": record.module,
-            "trace_id": getattr(record, "trace_id", "00000000000000000000000000000000"),
-            "span_id": getattr(record, "span_id", "0000000000000000"),
+            "trace_id": trace_id,
+            "span_id": span_id,
         }
         return json.dumps(log_record)
 
@@ -114,13 +125,16 @@ app.add_middleware(
 # Middleware de Observabilidad y Correlación
 @app.middleware("http")
 async def correlation_logging_middleware(request: Request, call_next):
-    trace_id = request.headers.get("x-trace-id", str(uuid.uuid4()))
-    start_time = time.time()
+    trace_id, span_id, traceparent = extract_trace_context(request)
+    request.state.trace_id = trace_id
+    request.state.span_id = span_id
+    request.state.traceparent = traceparent
 
+    start_time = time.time()
     response = await call_next(request)
     duration_ms = (time.time() - start_time) * 1000
 
-    extra = {"trace_id": trace_id}
+    extra = {"trace_id": trace_id, "span_id": span_id}
     logger.info(
         f"{request.method} {request.url.path} - Status {response.status_code} ({duration_ms:.2f}ms)",
         extra=extra,
@@ -128,13 +142,12 @@ async def correlation_logging_middleware(request: Request, call_next):
     return response
 
 
-# OpenTelemetry opcional
-try:
-    from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
-
-    FastAPIInstrumentor.instrument_app(app)
-except (ImportError, RuntimeError, TypeError) as e:
-    logger.debug(f"OpenTelemetry FastAPI instrumentation not loaded: {e}")
+# OpenTelemetry (TracerProvider + OTLP + FastAPI + HTTPX)
+setup_telemetry(
+    app=app,
+    service_name=settings.service_name,
+    otlp_endpoint=settings.otlp_endpoint,
+)
 
 app.include_router(
     create_itinerary_router(

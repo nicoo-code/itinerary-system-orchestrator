@@ -22,6 +22,7 @@ class JsonFormatter(logging.Formatter):
             "message": record.getMessage(),
             "module": record.module,
             "trace_id": getattr(record, "trace_id", "00000000000000000000000000000000"),
+            "span_id": getattr(record, "span_id", "0000000000000000"),
         }
         return json.dumps(log_record)
 
