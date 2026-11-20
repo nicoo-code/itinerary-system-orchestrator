@@ -1,0 +1,37 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: itinerarios-app
+  labels:
+    app.kubernetes.io/part-of: itinerarios-platform
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: itinerarios-config
+  namespace: itinerarios-app
+data:
+  LOG_LEVEL: "INFO"
+  API_COLOMBIA_URL: "https://api-colombia.com/api/v1/Airport"
+  REDIS_URL: "redis://redis:6379/0"
+  AIRPORT_SERVICE_URL: "http://airport-service:8001"
+  ITINERARY_SERVICE_URL: "http://itinerary-service:8002"
+  NOTIFICATION_SERVICE_URL: "http://notification-service:8003"
+  OTEL_EXPORTER_OTLP_ENDPOINT: "http://jaeger:4317"
+  FRONTEND_DIR: "/app/frontend"
+  NOTIFICATIONS_DB_PATH: "/app/notifications.db"
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: itinerarios-secrets
+  namespace: itinerarios-app
+type: Opaque
+stringData:
+  POSTGRES_USER: "itinerary_user"
+  POSTGRES_PASSWORD: "itinerary_pass"
+  POSTGRES_DB: "itinerary_db"
+  DATABASE_URL: "postgresql://itinerary_user:itinerary_pass@postgres-itinerary:5432/itinerary_db"
+  RABBITMQ_DEFAULT_USER: "guest"
+  RABBITMQ_DEFAULT_PASS: "guest"
+  RABBITMQ_URL: "amqp://guest:guest@rabbitmq:5672/"

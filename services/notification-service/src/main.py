@@ -2,9 +2,17 @@ import asyncio
 import json
 import logging
 import sys
+import time
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request, Response
+from prometheus_client import (
+    CONTENT_TYPE_LATEST,
+    REGISTRY,
+    Counter,
+    Histogram,
+    generate_latest,
+)
 from src.config import settings
 from src.consumers.rabbitmq_event_consumer import RabbitMQEventConsumer
 from src.functions.generate_report_function import GenerateReportFunction
@@ -83,6 +91,53 @@ async def get_report():
 @app.get("/api/v1/notifications/logs")
 async def get_logs():
     return repo.list_all()
+
+
+def _get_or_create_metric(
+    metric_cls, name: str, documentation: str, labelnames: tuple[str, ...] = ()
+):
+    if name in REGISTRY._names_to_collectors:
+        return REGISTRY._names_to_collectors[name]
+    return metric_cls(name, documentation, labelnames=labelnames)
+
+
+HTTP_REQUESTS_TOTAL = _get_or_create_metric(
+    Counter,
+    "http_requests_total",
+    "Total HTTP requests processed",
+    ("service", "method", "path", "status_code"),
+)
+HTTP_REQUEST_DURATION_SECONDS = _get_or_create_metric(
+    Histogram,
+    "http_request_duration_seconds",
+    "HTTP request latency in seconds",
+    ("service", "method", "path"),
+)
+
+
+@app.middleware("http")
+async def prometheus_metrics_middleware(request: Request, call_next):
+    start_time = time.perf_counter()
+    response = await call_next(request)
+    duration = time.perf_counter() - start_time
+    path = request.url.path
+    HTTP_REQUESTS_TOTAL.labels(
+        service=settings.service_name,
+        method=request.method,
+        path=path,
+        status_code=str(response.status_code),
+    ).inc()
+    HTTP_REQUEST_DURATION_SECONDS.labels(
+        service=settings.service_name,
+        method=request.method,
+        path=path,
+    ).observe(duration)
+    return response
+
+
+@app.get("/metrics", tags=["Metrics"], summary="Exponer métricas Prometheus")
+async def metrics():
+    return Response(content=generate_latest(), media_type=CONTENT_TYPE_LATEST)
 
 
 if __name__ == "__main__":

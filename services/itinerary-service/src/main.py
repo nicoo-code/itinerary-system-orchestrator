@@ -6,8 +6,15 @@ import time
 import uuid
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
+from prometheus_client import (
+    CONTENT_TYPE_LATEST,
+    REGISTRY,
+    Counter,
+    Histogram,
+    generate_latest,
+)
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from src.application.create_itinerary import CreateItineraryUseCase
@@ -146,6 +153,65 @@ app.include_router(
         worker_status_callback=lambda: outbox_worker._is_running,
     )
 )
+
+
+def _get_or_create_metric(
+    metric_cls, name: str, documentation: str, labelnames: tuple[str, ...] = ()
+):
+    if name in REGISTRY._names_to_collectors:
+        return REGISTRY._names_to_collectors[name]
+    return metric_cls(name, documentation, labelnames=labelnames)
+
+
+HTTP_REQUESTS_TOTAL = _get_or_create_metric(
+    Counter,
+    "http_requests_total",
+    "Total HTTP requests processed",
+    ("service", "method", "path", "status_code"),
+)
+HTTP_REQUEST_DURATION_SECONDS = _get_or_create_metric(
+    Histogram,
+    "http_request_duration_seconds",
+    "HTTP request latency in seconds",
+    ("service", "method", "path"),
+)
+ITINERARIES_CREATED_TOTAL = _get_or_create_metric(
+    Counter,
+    "itineraries_created_total",
+    "Total number of itineraries created",
+)
+
+
+@app.middleware("http")
+async def prometheus_metrics_middleware(request: Request, call_next):
+    start_time = time.perf_counter()
+    response = await call_next(request)
+    duration = time.perf_counter() - start_time
+    path = request.url.path
+    HTTP_REQUESTS_TOTAL.labels(
+        service=settings.service_name,
+        method=request.method,
+        path=path,
+        status_code=str(response.status_code),
+    ).inc()
+    HTTP_REQUEST_DURATION_SECONDS.labels(
+        service=settings.service_name,
+        method=request.method,
+        path=path,
+    ).observe(duration)
+    if (
+        request.method == "POST"
+        and path.rstrip("/") == "/api/v1/itineraries"
+        and response.status_code == 201
+    ):
+        ITINERARIES_CREATED_TOTAL.inc()
+    return response
+
+
+@app.get("/metrics", tags=["Metrics"], summary="Exponer métricas Prometheus")
+async def metrics():
+    return Response(content=generate_latest(), media_type=CONTENT_TYPE_LATEST)
+
 
 if __name__ == "__main__":
     import uvicorn
