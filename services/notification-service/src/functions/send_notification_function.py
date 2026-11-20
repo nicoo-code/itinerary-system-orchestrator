@@ -19,11 +19,23 @@ class SendNotificationFunction:
         """Punto de entrada de ejecución de la función sin servidor."""
         event_id = event_data.get("event_id")
         event_type = event_data.get("event_type")
-        trace_id = event_data.get("trace_id", "00000000000000000000000000000000")
+        metadata = (
+            event_data.get("metadata")
+            if isinstance(event_data.get("metadata"), dict)
+            else {}
+        )
+        trace_id = (
+            metadata.get("trace_id")
+            or event_data.get("trace_id")
+            or "00000000000000000000000000000000"
+        )
         data = event_data.get("data", {})
 
         if event_type != "ItineraryCreatedEvent" or not data:
-            logger.warning(f"Ignored unknown or invalid event type: {event_type}")
+            logger.warning(
+                f"Ignored unknown or invalid event type: {event_type}",
+                extra={"trace_id": trace_id},
+            )
             return False
 
         itinerary_id = data.get("itinerary_id")

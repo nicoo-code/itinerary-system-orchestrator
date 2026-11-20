@@ -59,9 +59,19 @@ class RabbitMQEventConsumer:
                             try:
                                 body_str = message.body.decode("utf-8")
                                 payload = json.loads(body_str)
-                                trace_id = message.headers.get(
-                                    "trace_id", payload.get("trace_id", "")
+                                metadata = (
+                                    payload.get("metadata")
+                                    if isinstance(payload.get("metadata"), dict)
+                                    else {}
                                 )
+                                headers = getattr(message, "headers", None) or {}
+                                trace_id = (
+                                    headers.get("trace_id")
+                                    or metadata.get("trace_id")
+                                    or payload.get("trace_id")
+                                    or "00000000000000000000000000000000"
+                                )
+                                payload["trace_id"] = trace_id
 
                                 logger.info(
                                     f"Received message on queue {self.queue_name}: {payload.get('event_type')}",
