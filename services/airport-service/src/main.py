@@ -3,8 +3,16 @@ import logging
 import sys
 import time
 
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
+from prometheus_client import (
+    CONTENT_TYPE_LATEST,
+    REGISTRY,
+    Counter,
+    Gauge,
+    Histogram,
+    generate_latest,
+)
 from src.application.get_airport_by_id import GetAirportByIdUseCase
 from src.application.get_airports_for_plotly import GetAirportsForPlotlyUseCase
 from src.application.invalidate_airports_cache import InvalidateAirportsCacheUseCase
@@ -127,6 +135,63 @@ app.include_router(
         invalidate_cache_use_case=invalidate_cache_uc,
     )
 )
+
+
+def _get_or_create_metric(
+    metric_cls, name: str, documentation: str, labelnames: tuple[str, ...] = ()
+):
+    if name in REGISTRY._names_to_collectors:
+        return REGISTRY._names_to_collectors[name]
+    return metric_cls(name, documentation, labelnames=labelnames)
+
+
+HTTP_REQUESTS_TOTAL = _get_or_create_metric(
+    Counter,
+    "http_requests_total",
+    "Total HTTP requests processed",
+    ("service", "method", "path", "status_code"),
+)
+HTTP_REQUEST_DURATION_SECONDS = _get_or_create_metric(
+    Histogram,
+    "http_request_duration_seconds",
+    "HTTP request latency in seconds",
+    ("service", "method", "path"),
+)
+AIRPORT_CIRCUIT_BREAKER_STATE = _get_or_create_metric(
+    Gauge,
+    "airport_circuit_breaker_state",
+    "Circuit breaker state for Airport Service (0=CLOSED, 1=HALF_OPEN, 2=OPEN)",
+)
+
+_CB_STATE_MAPPING = {"CLOSED": 0, "HALF_OPEN": 1, "OPEN": 2}
+
+
+@app.middleware("http")
+async def prometheus_metrics_middleware(request: Request, call_next):
+    start_time = time.perf_counter()
+    response = await call_next(request)
+    duration = time.perf_counter() - start_time
+    path = request.url.path
+    HTTP_REQUESTS_TOTAL.labels(
+        service=settings.service_name,
+        method=request.method,
+        path=path,
+        status_code=str(response.status_code),
+    ).inc()
+    HTTP_REQUEST_DURATION_SECONDS.labels(
+        service=settings.service_name,
+        method=request.method,
+        path=path,
+    ).observe(duration)
+    return response
+
+
+@app.get("/metrics", tags=["Metrics"], summary="Exponer métricas Prometheus")
+async def metrics():
+    state_str = getattr(circuit_breaker.state, "value", str(circuit_breaker.state))
+    AIRPORT_CIRCUIT_BREAKER_STATE.set(_CB_STATE_MAPPING.get(state_str, 0))
+    return Response(content=generate_latest(), media_type=CONTENT_TYPE_LATEST)
+
 
 if __name__ == "__main__":
     import uvicorn
