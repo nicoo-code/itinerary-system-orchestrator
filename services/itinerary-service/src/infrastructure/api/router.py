@@ -1,6 +1,6 @@
 import uuid
 
-from fastapi import APIRouter, HTTPException, Request, Response, status
+from fastapi import APIRouter, HTTPException, Query, Request, Response, status
 from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
 from src.application.create_itinerary import (
@@ -74,10 +74,17 @@ def create_itinerary_router(
         "/api/v1/itineraries",
         response_model=list[ItineraryResponse],
         summary="Listar todos los itinerarios",
-        description="Retorna el historial completo de itinerarios registrados en el sistema.",
+        description="Retorna el historial completo de itinerarios registrados en el sistema, con soporte opcional de paginación (limit/offset).",
     )
-    async def get_all_itineraries():
-        return await list_uc.execute()
+    async def get_all_itineraries(
+        response: Response,
+        limit: int | None = Query(default=None, ge=1, le=500),
+        offset: int = Query(default=0, ge=0),
+    ):
+        items = await list_uc.execute()
+        total = len(items)
+        response.headers["X-Total-Count"] = str(total)
+        return items[offset : offset + limit] if limit is not None else items[offset:]
 
     @router.get(
         "/api/v1/itineraries/{itinerary_id}",

@@ -71,6 +71,21 @@ class RedisCacheAdapter(CachePort):
         # Fallback en memoria
         self._in_memory_fallback[key] = (value, time.time() + ttl_seconds)
 
+    async def delete(self, key: str) -> bool:
+        deleted_in_redis = False
+        client = await self._get_client()
+        if client:
+            try:
+                res = await client.delete(key)
+                deleted_in_redis = bool(res and int(res) > 0)
+            except (RedisError, OSError, TimeoutError) as e:
+                logger.warning(
+                    f"Redis DELETE failed for key '{key}': {e}. Falling back to in-memory."
+                )
+
+        deleted_in_memory = self._in_memory_fallback.pop(key, None) is not None
+        return deleted_in_redis or deleted_in_memory
+
     async def ping(self) -> bool:
         client = await self._get_client()
         if client:
