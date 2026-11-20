@@ -11,3 +11,7 @@ class CachePort(ABC):
     @abstractmethod
     async def set(self, key: str, value: str, ttl_seconds: int = 3600) -> None:
         """Almacena un valor serializado en caché con un tiempo de vida (TTL) determinado."""
+
+    @abstractmethod
+    async def delete(self, key: str) -> bool:
+        """Elimina una clave de la memoria caché. Retorna True si fue eliminada, False si no existía."""

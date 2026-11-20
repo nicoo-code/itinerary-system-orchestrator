@@ -63,3 +63,35 @@ async def test_get_plotly_map_endpoint():
         assert "data" in data
         assert "layout" in data
         assert "count" in data
+
+
+@pytest.mark.asyncio
+async def test_get_airports_pagination_and_total_count_header():
+    async with AsyncClient(
+        transport=ASGITransport(app=app), base_url="http://test"
+    ) as client:
+        full_res = await client.get("/api/v1/airports")
+        assert full_res.status_code == 200
+        full_data = full_res.json()
+        total = len(full_data)
+        assert full_res.headers.get("X-Total-Count") == str(total)
+
+        page_res = await client.get("/api/v1/airports?limit=3&offset=1")
+        assert page_res.status_code == 200
+        page_data = page_res.json()
+        assert len(page_data) == 3
+        assert page_res.headers.get("X-Total-Count") == str(total)
+        assert page_data[0]["id"] == full_data[1]["id"]
+
+
+@pytest.mark.asyncio
+async def test_delete_airports_cache_endpoint():
+    async with AsyncClient(
+        transport=ASGITransport(app=app), base_url="http://test"
+    ) as client:
+        await client.get("/api/v1/airports")
+        del_res = await client.delete("/api/v1/airports/cache")
+        assert del_res.status_code == 200
+        payload = del_res.json()
+        assert "invalidated" in payload
+        assert payload["cache_key"] == "airports:all:catalog"

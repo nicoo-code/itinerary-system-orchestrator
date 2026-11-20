@@ -1,6 +1,7 @@
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, HTTPException, Query, Response, status
 from src.application.get_airport_by_id import GetAirportByIdUseCase
 from src.application.get_airports_for_plotly import GetAirportsForPlotlyUseCase
+from src.application.invalidate_airports_cache import InvalidateAirportsCacheUseCase
 from src.application.list_airports import ListAirportsUseCase
 from src.infrastructure.api.schemas import AirportResponse, HealthCheckResponse
 
@@ -11,18 +12,43 @@ def create_airport_router(
     get_plotly_use_case: GetAirportsForPlotlyUseCase,
     redis_adapter,
     circuit_breaker,
+    invalidate_cache_use_case: InvalidateAirportsCacheUseCase | None = None,
 ) -> APIRouter:
     router = APIRouter(prefix="", tags=["Airports"])
+    effective_invalidate_uc = (
+        invalidate_cache_use_case
+        or InvalidateAirportsCacheUseCase(cache_port=redis_adapter)
+    )
 
     @router.get(
         "/api/v1/airports",
         response_model=list[AirportResponse],
         summary="Listar todos los aeropuertos",
-        description="Retorna el catálogo canónico completo de aeropuertos colombianos adaptado al dominio.",
+        description="Retorna el catálogo canónico completo de aeropuertos colombianos adaptado al dominio, con soporte opcional de paginación (limit/offset).",
     )
-    async def get_airports():
+    async def get_airports(
+        response: Response,
+        limit: int | None = Query(default=None, ge=1, le=500),
+        offset: int = Query(default=0, ge=0),
+    ):
         airports = await list_airports_use_case.execute()
-        return [AirportResponse.model_validate(a.to_dict()) for a in airports]
+        total = len(airports)
+        response.headers["X-Total-Count"] = str(total)
+        sliced = (
+            airports[offset : offset + limit]
+            if limit is not None
+            else airports[offset:]
+        )
+        return [AirportResponse.model_validate(a.to_dict()) for a in sliced]
+
+    @router.delete(
+        "/api/v1/airports/cache",
+        status_code=status.HTTP_200_OK,
+        summary="Invalidar caché de aeropuertos",
+        description="Invalida explícitamente la clave del catálogo de aeropuertos en Redis y en el fallback en memoria.",
+    )
+    async def invalidate_airports_cache():
+        return await effective_invalidate_uc.execute()
 
     @router.get(
         "/api/v1/airports/map/plotly",

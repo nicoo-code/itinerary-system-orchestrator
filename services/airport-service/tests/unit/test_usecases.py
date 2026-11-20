@@ -3,9 +3,11 @@ from unittest.mock import AsyncMock
 import pytest
 from src.application.get_airport_by_id import GetAirportByIdUseCase
 from src.application.get_airports_for_plotly import GetAirportsForPlotlyUseCase
-from src.application.list_airports import ListAirportsUseCase
+from src.application.invalidate_airports_cache import InvalidateAirportsCacheUseCase
+from src.application.list_airports import CACHE_KEY_AIRPORTS, ListAirportsUseCase
 from src.domain.models.airport import Airport
 from src.infrastructure.adapters.plotly_adapter import PlotlyAdapter
+from src.infrastructure.adapters.redis_cache_adapter import RedisCacheAdapter
 
 
 @pytest.fixture
@@ -115,3 +117,31 @@ async def test_get_airports_for_plotly(sample_airports):
     assert "data" in result
     assert "layout" in result
     assert result["count"] == 2
+
+
+@pytest.mark.asyncio
+async def test_invalidate_airports_cache_use_case():
+    mock_cache = AsyncMock()
+    mock_cache.delete.return_value = True
+
+    uc = InvalidateAirportsCacheUseCase(cache_port=mock_cache)
+    result = await uc.execute()
+
+    assert result == {"invalidated": True, "cache_key": CACHE_KEY_AIRPORTS}
+    mock_cache.delete.assert_called_once_with(CACHE_KEY_AIRPORTS)
+
+
+@pytest.mark.asyncio
+async def test_redis_cache_adapter_in_memory_fallback_delete():
+    adapter = RedisCacheAdapter(redis_url="redis://invalid-host-for-test:6379/0")
+    adapter._get_client = AsyncMock(return_value=None)
+
+    await adapter.set("test:key", "value", ttl_seconds=60)
+    assert await adapter.get("test:key") == "value"
+
+    deleted = await adapter.delete("test:key")
+    assert deleted is True
+    assert await adapter.get("test:key") is None
+
+    deleted_again = await adapter.delete("test:key")
+    assert deleted_again is False

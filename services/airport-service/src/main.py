@@ -7,6 +7,7 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from src.application.get_airport_by_id import GetAirportByIdUseCase
 from src.application.get_airports_for_plotly import GetAirportsForPlotlyUseCase
+from src.application.invalidate_airports_cache import InvalidateAirportsCacheUseCase
 from src.application.list_airports import ListAirportsUseCase
 from src.infrastructure.adapters.api_colombia_adapter import ApiColombiaAdapter
 from src.infrastructure.adapters.circuit_breaker import CircuitBreaker
@@ -57,6 +58,7 @@ get_airport_by_id_uc = GetAirportByIdUseCase(
 get_plotly_uc = GetAirportsForPlotlyUseCase(
     list_use_case=list_airports_uc, plotly_adapter=plotly_adapter
 )
+invalidate_cache_uc = InvalidateAirportsCacheUseCase(cache_port=redis_adapter)
 
 app = FastAPI(
     title="Airport Microservice - Arquitectura Hexagonal",
@@ -113,6 +115,7 @@ app.include_router(
         get_plotly_use_case=get_plotly_uc,
         redis_adapter=redis_adapter,
         circuit_breaker=circuit_breaker,
+        invalidate_cache_use_case=invalidate_cache_uc,
     )
 )
 
