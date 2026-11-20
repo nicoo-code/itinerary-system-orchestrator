@@ -1,6 +1,6 @@
 import uuid
 
-from fastapi import APIRouter, HTTPException, Query, Request, Response, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response, status
 from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
 from src.application.create_itinerary import (
@@ -14,6 +14,7 @@ from src.application.get_itinerary import (
     ListItinerariesUseCase,
 )
 from src.application.update_itinerary import UpdateItineraryUseCase
+from src.infrastructure.api.auth import require_jwt_token
 from src.infrastructure.api.schemas import (
     CreateItineraryRequest,
     HealthCheckResponse,
@@ -39,6 +40,7 @@ def create_itinerary_router(
         status_code=status.HTTP_201_CREATED,
         summary="Crear un nuevo itinerario",
         description="Valida la existencia de los aeropuertos vía HTTP con Airport Service y persiste atómicamente el itinerario y el evento outbox.",
+        dependencies=[Depends(require_jwt_token)],
     )
     async def create_itinerary(payload: CreateItineraryRequest, request: Request):
         # Extraer correlation trace_id si existe
@@ -107,6 +109,7 @@ def create_itinerary_router(
         status_code=status.HTTP_200_OK,
         summary="Actualizar un itinerario existente",
         description="Actualiza los datos de un itinerario validando aeropuertos síncronamente con Airport Service.",
+        dependencies=[Depends(require_jwt_token)],
     )
     async def update_itinerary(
         itinerary_id: uuid.UUID, payload: UpdateItineraryRequest
@@ -152,6 +155,7 @@ def create_itinerary_router(
         status_code=status.HTTP_204_NO_CONTENT,
         summary="Eliminar un itinerario",
         description="Elimina el registro de un itinerario por su UUID.",
+        dependencies=[Depends(require_jwt_token)],
     )
     async def delete_itinerary(itinerary_id: uuid.UUID):
         success = await delete_uc.execute(itinerary_id)
