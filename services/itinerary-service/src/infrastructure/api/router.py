@@ -13,10 +13,12 @@ from src.application.get_itinerary import (
     GetItineraryUseCase,
     ListItinerariesUseCase,
 )
+from src.application.update_itinerary import UpdateItineraryUseCase
 from src.infrastructure.api.schemas import (
     CreateItineraryRequest,
     HealthCheckResponse,
     ItineraryResponse,
+    UpdateItineraryRequest,
 )
 
 
@@ -27,6 +29,7 @@ def create_itinerary_router(
     delete_uc: DeleteItineraryUseCase,
     session_factory,
     worker_status_callback,
+    update_uc: UpdateItineraryUseCase | None = None,
 ) -> APIRouter:
     router = APIRouter(prefix="", tags=["Itineraries"])
 
@@ -84,6 +87,52 @@ def create_itinerary_router(
     )
     async def get_itinerary_by_id(itinerary_id: uuid.UUID):
         itinerary = await get_uc.execute(itinerary_id)
+        if not itinerary:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Itinerario con ID {itinerary_id} no encontrado.",
+            )
+        return itinerary
+
+    @router.put(
+        "/api/v1/itineraries/{itinerary_id}",
+        response_model=ItineraryResponse,
+        status_code=status.HTTP_200_OK,
+        summary="Actualizar un itinerario existente",
+        description="Actualiza los datos de un itinerario validando aeropuertos síncronamente con Airport Service.",
+    )
+    async def update_itinerary(
+        itinerary_id: uuid.UUID, payload: UpdateItineraryRequest
+    ):
+        if update_uc is None:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Caso de uso de actualización no configurado.",
+            )
+        try:
+            itinerary = await update_uc.execute(
+                itinerary_id=itinerary_id,
+                user_name=payload.user_name,
+                origin_airport_id=payload.origin_airport_id,
+                destination_airport_id=payload.destination_airport_id,
+                departure_date=payload.departure_date,
+                duration_minutes=payload.duration_minutes,
+                status=payload.status,
+            )
+        except AirportNotFoundException as exc:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)
+            )
+        except InvalidItineraryException as exc:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)
+            )
+        except (RuntimeError, ValueError, KeyError, OSError) as exc:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Error interno al actualizar el itinerario: {exc}",
+            ) from exc
+
         if not itinerary:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,

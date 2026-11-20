@@ -22,5 +22,9 @@ class ItineraryRepositoryPort(ABC):
         """Obtiene la lista completa de itinerarios registrados."""
 
     @abstractmethod
+    async def update(self, itinerary: Itinerary) -> Itinerary | None:
+        """Actualiza un itinerario existente en la base de datos."""
+
+    @abstractmethod
     async def delete(self, itinerary_id: uuid.UUID) -> bool:
         """Elimina un itinerario por su identificador único."""

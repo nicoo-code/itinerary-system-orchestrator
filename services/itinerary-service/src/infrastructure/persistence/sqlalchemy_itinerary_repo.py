@@ -118,6 +118,34 @@ class SqlAlchemyItineraryRepository(ItineraryRepositoryPort, OutboxRepositoryPor
         finally:
             session.close()
 
+    async def update(self, itinerary: Itinerary) -> Itinerary | None:
+        session: Session = self.session_factory()
+        try:
+            model = (
+                session.query(ItineraryModel)
+                .filter(ItineraryModel.id == str(itinerary.id))
+                .first()
+            )
+            if not model:
+                return None
+
+            model.user_name = itinerary.user_name
+            model.origin_airport_id = itinerary.origin_airport_id
+            model.destination_airport_id = itinerary.destination_airport_id
+            model.departure_date = itinerary.departure_date
+            model.duration_minutes = itinerary.duration_minutes
+            model.status = itinerary.status
+            model.updated_at = itinerary.updated_at
+
+            session.commit()
+            session.refresh(model)
+            return self._to_domain_itinerary(model)
+        except Exception:
+            session.rollback()
+            raise
+        finally:
+            session.close()
+
     async def delete(self, itinerary_id: uuid.UUID) -> bool:
         session: Session = self.session_factory()
         try:

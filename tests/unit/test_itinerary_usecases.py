@@ -13,6 +13,7 @@ from src.application.get_itinerary import (
     GetItineraryUseCase,
     ListItinerariesUseCase,
 )
+from src.application.update_itinerary import UpdateItineraryUseCase
 from src.domain.models.itinerary import Itinerary, OutboxEvent
 
 
@@ -129,3 +130,117 @@ async def test_get_and_list_itineraries(mock_repo):
 
     deleted = await del_uc.execute(test_id)
     assert deleted is True
+
+
+@pytest.mark.asyncio
+async def test_update_itinerary_success(mock_repo, mock_validator):
+    test_id = uuid.uuid4()
+    original_created_at = datetime.now(UTC)
+    existing_itin = Itinerary(
+        id=test_id,
+        user_name="Carlos Original",
+        origin_airport_id=1,
+        destination_airport_id=5,
+        departure_date=original_created_at,
+        duration_minutes=60,
+        status="CREATED",
+        created_at=original_created_at,
+        updated_at=original_created_at,
+    )
+    mock_repo.find_by_id.return_value = existing_itin
+    mock_repo.update.side_effect = lambda itin: itin
+
+    use_case = UpdateItineraryUseCase(mock_repo, mock_validator)
+    new_departure = datetime.now(UTC)
+    updated = await use_case.execute(
+        itinerary_id=test_id,
+        user_name="Carlos Actualizado",
+        origin_airport_id=2,
+        destination_airport_id=8,
+        departure_date=new_departure,
+        duration_minutes=90,
+        status="CONFIRMED",
+    )
+
+    assert updated is not None
+    assert updated.id == test_id
+    assert updated.user_name == "Carlos Actualizado"
+    assert updated.origin_airport_id == 2
+    assert updated.destination_airport_id == 8
+    assert updated.duration_minutes == 90
+    assert updated.status == "CONFIRMED"
+    assert updated.created_at == original_created_at
+    assert mock_validator.validate_airport_exists.call_count == 2
+    mock_repo.update.assert_called_once()
+
+
+@pytest.mark.asyncio
+async def test_update_itinerary_not_found_returns_none(mock_repo, mock_validator):
+    mock_repo.find_by_id.return_value = None
+    use_case = UpdateItineraryUseCase(mock_repo, mock_validator)
+
+    result = await use_case.execute(
+        itinerary_id=uuid.uuid4(),
+        user_name="Inexistente",
+        origin_airport_id=1,
+        destination_airport_id=5,
+        departure_date=datetime.now(UTC),
+        duration_minutes=60,
+    )
+
+    assert result is None
+    mock_repo.update.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_update_itinerary_fails_same_airports(mock_repo, mock_validator):
+    test_id = uuid.uuid4()
+    mock_repo.find_by_id.return_value = Itinerary(
+        id=test_id,
+        user_name="Ana Lopez",
+        origin_airport_id=1,
+        destination_airport_id=5,
+        departure_date=datetime.now(UTC),
+        duration_minutes=45,
+    )
+    use_case = UpdateItineraryUseCase(mock_repo, mock_validator)
+
+    with pytest.raises(InvalidItineraryException):
+        await use_case.execute(
+            itinerary_id=test_id,
+            user_name="Ana Lopez",
+            origin_airport_id=3,
+            destination_airport_id=3,
+            departure_date=datetime.now(UTC),
+            duration_minutes=45,
+        )
+
+    mock_repo.update.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_update_itinerary_fails_airport_not_found(mock_repo, mock_validator):
+    test_id = uuid.uuid4()
+    mock_repo.find_by_id.return_value = Itinerary(
+        id=test_id,
+        user_name="Pedro Pascal",
+        origin_airport_id=1,
+        destination_airport_id=5,
+        departure_date=datetime.now(UTC),
+        duration_minutes=50,
+    )
+    mock_validator.validate_airport_exists.side_effect = lambda aid: aid != 888
+    use_case = UpdateItineraryUseCase(mock_repo, mock_validator)
+
+    with pytest.raises(AirportNotFoundException) as excinfo:
+        await use_case.execute(
+            itinerary_id=test_id,
+            user_name="Pedro Pascal",
+            origin_airport_id=1,
+            destination_airport_id=888,
+            departure_date=datetime.now(UTC),
+            duration_minutes=50,
+        )
+
+    assert "888" in str(excinfo.value)
+    mock_repo.update.assert_not_called()

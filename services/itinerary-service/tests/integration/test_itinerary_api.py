@@ -56,13 +56,39 @@ async def test_create_and_get_itinerary_flow(monkeypatch):
         assert res_list.status_code == 200
         assert any(item["id"] == itinerary_id for item in res_list.json())
 
+        # 3.5. Actualizar itinerario (PUT)
+        update_payload = {
+            "user_name": "Valeria Morales Actualizada",
+            "origin_airport_id": 2,
+            "destination_airport_id": 15,
+            "departure_date": datetime.now(UTC).isoformat(),
+            "duration_minutes": 95,
+            "status": "CONFIRMED",
+        }
+        res_update = await client.put(
+            f"/api/v1/itineraries/{itinerary_id}", json=update_payload
+        )
+        assert res_update.status_code == 200
+        updated_data = res_update.json()
+        assert updated_data["id"] == itinerary_id
+        assert updated_data["user_name"] == "Valeria Morales Actualizada"
+        assert updated_data["origin_airport_id"] == 2
+        assert updated_data["destination_airport_id"] == 15
+        assert updated_data["duration_minutes"] == 95
+        assert updated_data["status"] == "CONFIRMED"
+
         # 4. Eliminar
         res_del = await client.delete(f"/api/v1/itineraries/{itinerary_id}")
         assert res_del.status_code == 204
 
-        # 5. Verificar 404 tras eliminación
+        # 5. Verificar 404 tras eliminación (GET y PUT)
         res_not_found = await client.get(f"/api/v1/itineraries/{itinerary_id}")
         assert res_not_found.status_code == 404
+
+        res_put_not_found = await client.put(
+            f"/api/v1/itineraries/{itinerary_id}", json=update_payload
+        )
+        assert res_put_not_found.status_code == 404
 
 
 @pytest.mark.asyncio

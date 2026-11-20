@@ -16,6 +16,7 @@ from src.application.get_itinerary import (
     GetItineraryUseCase,
     ListItinerariesUseCase,
 )
+from src.application.update_itinerary import UpdateItineraryUseCase
 from src.infrastructure.api.router import create_itinerary_router
 from src.infrastructure.clients.airport_http_validator import AirportHttpValidator
 from src.infrastructure.config import settings
@@ -54,7 +55,7 @@ connect_args = {"check_same_thread": False} if "sqlite" in settings.database_url
 engine = create_engine(settings.database_url, connect_args=connect_args, echo=False)
 SessionFactory = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
-# Crear tablas si no existen
+# Respaldo seguro para entornos SQLite de pruebas; en despliegue real las migraciones se ejecutan con `alembic upgrade head` en entrypoint.sh
 Base.metadata.create_all(bind=engine)
 
 # Inicialización Hexagonal
@@ -72,6 +73,9 @@ create_uc = CreateItineraryUseCase(
 )
 get_uc = GetItineraryUseCase(itinerary_repo=itinerary_repo)
 list_uc = ListItinerariesUseCase(itinerary_repo=itinerary_repo)
+update_uc = UpdateItineraryUseCase(
+    itinerary_repo=itinerary_repo, airport_validator=airport_validator
+)
 delete_uc = DeleteItineraryUseCase(itinerary_repo=itinerary_repo)
 
 worker_task = None
@@ -144,6 +148,7 @@ app.include_router(
         delete_uc=delete_uc,
         session_factory=SessionFactory,
         worker_status_callback=lambda: outbox_worker._is_running,
+        update_uc=update_uc,
     )
 )
 
