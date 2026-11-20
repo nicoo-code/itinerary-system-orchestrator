@@ -10,6 +10,20 @@ from fastapi import FastAPI, HTTPException, Request, Response, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
+from pydantic import BaseModel, Field, field_validator
+
+try:
+    from src.auth import (
+        JWT_EXPIRE_MINUTES,
+        create_access_token,
+        require_gateway_jwt,
+    )
+except ImportError:  # pragma: no cover
+    from auth import (
+        JWT_EXPIRE_MINUTES,
+        create_access_token,
+        require_gateway_jwt,
+    )
 
 # Variables de entorno
 PORT = int(os.getenv("PORT", "8000"))
@@ -156,6 +170,40 @@ async def route_airports_root(request: Request):
     return await forward_request(target, request)
 
 
+# Esquemas y Endpoint de Autenticación JWT
+class TokenRequest(BaseModel):
+    username: str = Field(..., min_length=1, max_length=100)
+    role: str = Field(default="traveler", min_length=1, max_length=50)
+
+    @field_validator("username")
+    @classmethod
+    def validate_username(cls, value: str) -> str:
+        cleaned = value.strip()
+        if not cleaned:
+            raise ValueError("El nombre de usuario no puede estar vacío.")
+        return cleaned
+
+
+class TokenResponse(BaseModel):
+    access_token: str
+    token_type: str = "bearer"
+    expires_in: int = 3600
+
+
+@app.post(
+    "/api/v1/auth/token",
+    response_model=TokenResponse,
+    summary="Emitir token JWT de sesión",
+)
+async def issue_auth_token(payload: TokenRequest):
+    token = create_access_token(subject=payload.username, role=payload.role)
+    return TokenResponse(
+        access_token=token,
+        token_type="bearer",
+        expires_in=JWT_EXPIRE_MINUTES * 60,
+    )
+
+
 # Rutas de itinerarios
 @app.api_route(
     "/api/v1/itineraries/{path:path}", methods=["GET", "POST", "PUT", "DELETE"]
@@ -164,12 +212,16 @@ async def route_itineraries(path: str, request: Request):
     if path == "health":
         target = f"{ITINERARY_SERVICE_URL}/health"
     else:
+        if request.method in {"POST", "PUT", "PATCH", "DELETE"}:
+            require_gateway_jwt(request)
         target = f"{ITINERARY_SERVICE_URL}/api/v1/itineraries/{path}"
     return await forward_request(target, request)
 
 
 @app.api_route("/api/v1/itineraries", methods=["GET", "POST"])
 async def route_itineraries_root(request: Request):
+    if request.method in {"POST", "PUT", "PATCH", "DELETE"}:
+        require_gateway_jwt(request)
     target = f"{ITINERARY_SERVICE_URL}/api/v1/itineraries"
     return await forward_request(target, request)
 

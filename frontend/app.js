@@ -1023,6 +1023,58 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
+  // ==========================================
+  // AUTENTICACIÓN JWT TRANSPARENTE (SESSION)
+  // ==========================================
+  const JWT_SESSION_KEY = 'aero_jwt_token';
+
+  async function obtainJwtToken(forceRefresh = false, usernameHint = null) {
+    if (!forceRefresh) {
+      const existing = sessionStorage.getItem(JWT_SESSION_KEY);
+      if (existing) return existing;
+    }
+
+    const username =
+      (usernameHint && String(usernameHint).trim()) ||
+      (dom.userNameInput && dom.userNameInput.value.trim()) ||
+      'aero-frontend-user';
+
+    const res = await fetch('/api/v1/auth/token', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username })
+    });
+
+    if (!res.ok) {
+      throw new Error(`No se pudo obtener token JWT (HTTP ${res.status})`);
+    }
+
+    const data = await res.json();
+    if (data && data.access_token) {
+      sessionStorage.setItem(JWT_SESSION_KEY, data.access_token);
+      return data.access_token;
+    }
+    throw new Error('Respuesta de autenticación sin access_token');
+  }
+
+  async function fetchWithJwt(url, options = {}, usernameHint = null) {
+    const token = await obtainJwtToken(false, usernameHint);
+    const headers = Object.assign({}, options.headers || {}, {
+      Authorization: `Bearer ${token}`
+    });
+
+    let response = await fetch(url, Object.assign({}, options, { headers }));
+    if (response.status === 401) {
+      sessionStorage.removeItem(JWT_SESSION_KEY);
+      const refreshedToken = await obtainJwtToken(true, usernameHint);
+      const retryHeaders = Object.assign({}, options.headers || {}, {
+        Authorization: `Bearer ${refreshedToken}`
+      });
+      response = await fetch(url, Object.assign({}, options, { headers: retryHeaders }));
+    }
+    return response;
+  }
+
   // Enviar Formulario de Itinerario
   dom.form.addEventListener('submit', async (e) => {
     e.preventDefault();
@@ -1052,14 +1104,13 @@ document.addEventListener('DOMContentLoaded', () => {
     dom.btnSubmitText.textContent = 'Validando y persistiendo transacción ACID...';
 
     try {
-      const response = await fetch('/api/v1/itineraries', {
+      const response = await fetchWithJwt('/api/v1/itineraries', {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer sim-jwt-token-sample'
+          'Content-Type': 'application/json'
         },
         body: JSON.stringify(payload)
-      });
+      }, payload.user_name);
 
       const resData = await response.json();
 
@@ -1386,7 +1437,7 @@ document.addEventListener('DOMContentLoaded', () => {
       const targetId = state.itineraryToDelete.id;
 
       try {
-        const response = await fetch(`/api/v1/itineraries/${targetId}`, {
+        const response = await fetchWithJwt(`/api/v1/itineraries/${targetId}`, {
           method: 'DELETE'
         });
 
@@ -1595,6 +1646,7 @@ document.addEventListener('DOMContentLoaded', () => {
   restoreInitialTab();
   
   // Cargas asíncronas iniciales
+  obtainJwtToken().catch(err => console.warn('Initial JWT session warmup postponed:', err));
   loadAirportsCatalog();
   loadItineraries();
   checkSystemHealth();
