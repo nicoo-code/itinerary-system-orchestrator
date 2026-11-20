@@ -256,11 +256,24 @@ async def test_itinerary_service_s2s_jwt_protection(monkeypatch):
         res_get = await client.get(f"/api/v1/itineraries/{created_id}")
         assert res_get.status_code == 200
 
-        # 4. DELETE sin JWT -> 401
+        # 4. PUT sin JWT -> 401 y con JWT válido -> 200
+        res_put_unauth = await client.put(
+            f"/api/v1/itineraries/{created_id}", json=payload
+        )
+        assert res_put_unauth.status_code == 401
+
+        res_put_auth = await client.put(
+            f"/api/v1/itineraries/{created_id}",
+            json=payload,
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        assert res_put_auth.status_code == 200
+
+        # 5. DELETE sin JWT -> 401
         res_del_unauth = await client.delete(f"/api/v1/itineraries/{created_id}")
         assert res_del_unauth.status_code == 401
 
-        # 5. DELETE con JWT válido -> 204
+        # 6. DELETE con JWT válido -> 204
         res_del_auth = await client.delete(
             f"/api/v1/itineraries/{created_id}",
             headers={"Authorization": f"Bearer {token}"},

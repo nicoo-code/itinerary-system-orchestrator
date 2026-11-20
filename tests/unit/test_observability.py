@@ -119,11 +119,14 @@ def test_parse_traceparent_and_extract_trace_context():
 
 
 @pytest.mark.asyncio
-async def test_itinerary_middleware_extracts_traceparent_into_request_state():
+async def test_itinerary_middleware_extracts_traceparent_into_request_state(
+    monkeypatch,
+):
     """
     Verifica que el middleware de itinerary-service extraiga trace_id desde traceparent,
     lo inyecte en request.state.trace_id y lo propague al caso de uso CreateItineraryUseCase.
     """
+    monkeypatch.setenv("JWT_AUTH_ENABLED", "false")
     test_app = FastAPI()
 
     @test_app.middleware("http")
