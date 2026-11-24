@@ -1,11 +1,49 @@
+import logging
 import random
 from datetime import UTC, datetime, timedelta
 
 from locust import HttpUser, between, task
 
+logger = logging.getLogger(__name__)
+
 
 class SystemLoadUser(HttpUser):
     wait_time = between(1, 2.5)
+
+    def on_start(self):
+        self.headers = {"Content-Type": "application/json"}
+        try:
+            response = self.client.post(
+                "/api/v1/auth/token",
+                json={"username": "locust-user"},
+                name="/api/v1/auth/token",
+            )
+            if response.status_code == 200:
+                token = response.json().get("access_token")
+                if token:
+                    self.headers = {
+                        "Content-Type": "application/json",
+                        "Authorization": f"Bearer {token}",
+                    }
+                    return
+            logger.warning(
+                "No se obtuvo token JWT real desde /api/v1/auth/token (status=%s). "
+                "Se continuará sin cabecera Authorization.",
+                response.status_code,
+            )
+        except (
+            OSError,
+            ValueError,
+            KeyError,
+            TypeError,
+            AttributeError,
+            RuntimeError,
+        ) as exc:
+            logger.warning(
+                "Error solicitando token JWT en on_start(): %s. "
+                "Se continuará sin cabecera Authorization.",
+                exc,
+            )
 
     @task(3)
     def view_airports_catalog(self):
@@ -33,15 +71,10 @@ class SystemLoadUser(HttpUser):
             "duration_minutes": random.choice([45, 60, 90, 120]),
         }
 
-        headers = {
-            "Content-Type": "application/json",
-            "Authorization": "Bearer locust-token",
-        }
-
         self.client.post(
             "/api/v1/itineraries",
             json=payload,
-            headers=headers,
+            headers=self.headers,
             name="/api/v1/itineraries",
         )
 
