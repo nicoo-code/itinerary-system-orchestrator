@@ -1092,8 +1092,21 @@ document.addEventListener('DOMContentLoaded', () => {
       return;
     }
 
+    const userName = dom.userNameInput.value.trim();
+    if (userName.length < 2) {
+      showToast('Nombre Requerido', 'Ingrese el nombre completo del pasajero (mínimo 2 caracteres).', 'error');
+      dom.userNameInput.focus();
+      return;
+    }
+
+    if (!dom.departureDateInput.value || Number.isNaN(new Date(dom.departureDateInput.value).getTime())) {
+      showToast('Fecha Inválida', 'Seleccione una fecha y hora de salida válida.', 'error');
+      dom.departureDateInput.focus();
+      return;
+    }
+
     const payload = {
-      user_name: dom.userNameInput.value.trim(),
+      user_name: userName,
       origin_airport_id: originId,
       destination_airport_id: destId,
       departure_date: new Date(dom.departureDateInput.value).toISOString(),
@@ -1137,7 +1150,20 @@ document.addEventListener('DOMContentLoaded', () => {
         }, 3000);
 
       } else {
-        showToast('Error de Validación', resData.detail || 'No se pudo crear el itinerario.', 'error');
+        let errorMsg = 'No se pudo crear el itinerario.';
+        if (typeof resData.detail === 'string') {
+          errorMsg = resData.detail;
+        } else if (Array.isArray(resData.detail)) {
+          errorMsg = resData.detail
+            .map(item => {
+              const field = Array.isArray(item.loc) ? item.loc[item.loc.length - 1] : '';
+              return field ? `${field}: ${item.msg}` : item.msg || JSON.stringify(item);
+            })
+            .join(' | ');
+        } else if (resData.detail && typeof resData.detail === 'object') {
+          errorMsg = resData.detail.msg || JSON.stringify(resData.detail);
+        }
+        showToast('Error de Validación', errorMsg, 'error');
       }
     } catch (err) {
       showToast('Falla de Conexión', `Error al comunicar con el API Gateway: ${err.message}`, 'error');
