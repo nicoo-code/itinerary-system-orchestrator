@@ -137,14 +137,22 @@ class ApiColombiaAdapter(ExternalAirportPort):
             else (str(dept_raw) if dept_raw else "Desconocido")
         )
 
+        lat = float(raw.get("latitude", 0.0) or 0.0)
+        lon = float(raw.get("longitude", 0.0) or 0.0)
+
+        # Normalización Adapter: API Colombia retorna latitud/longitud invertidas
+        # (lat en rango [-85, -60] y lon en rango [-10, 20] para territorio colombiano).
+        if -85.0 <= lat <= -60.0 and -10.0 <= lon <= 20.0:
+            lat, lon = lon, lat
+
         return Airport(
             id=int(raw.get("id", 0)),
             name=str(raw.get("name", "Aeropuerto Sin Nombre")),
             iata_code=str(raw.get("iataCode") or raw.get("iata_code") or "N/A"),
             city=city_name,
             department=dept_name,
-            latitude=float(raw.get("latitude", 0.0) or 0.0),
-            longitude=float(raw.get("longitude", 0.0) or 0.0),
+            latitude=lat,
+            longitude=lon,
             type=str(raw.get("type", "Nacional")),
         )
 
